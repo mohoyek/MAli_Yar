@@ -3,47 +3,59 @@
 import { useState } from "react";
 import { Header, Breadcrumb } from "@/components/site/header";
 import { Footer, FloatingButtons } from "@/components/site/footer";
-import { HubView } from "@/components/site/hub";
+import { HomeView, type Tool } from "@/components/site/home";
 import { CompareCalculator } from "@/components/site/compare";
+import { SalaryTaxCalculator } from "@/components/site/salary-tax";
+import { PayrollCalculator } from "@/components/site/payroll";
+import { CheckDueCalculator } from "@/components/site/check-due";
 
-type View = "hub" | "compare";
+type View = "home" | Tool;
+
+const TOOL_LABEL: Record<Tool, string> = {
+  compare: "مقایسه مالیات عملکرد و ماده ۱۰۰",
+  "salary-tax": "محاسبه مالیات حقوق",
+  payroll: "محاسبه حقوق و دستمزد",
+  "check-due": "راس‌گیری چک",
+};
 
 export default function Page() {
-  const [view, setView] = useState<View>("hub");
+  const [view, setView] = useState<View>("home");
 
-  const goHub = () => {
-    setView("hub");
+  function goHome(section?: string) {
+    setView("home");
+    setTimeout(() => {
+      if (section) {
+        document.getElementById(section)?.scrollIntoView({ behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: 0 });
+      }
+    }, 60);
+  }
+
+  function openTool(t: Tool) {
+    setView(t);
     window.scrollTo({ top: 0 });
-  };
-  const goCompare = () => {
-    setView("compare");
-    window.scrollTo({ top: 0 });
-  };
+  }
+
+  const crumbs =
+    view === "home"
+      ? [{ label: "خانه" }]
+      : [
+          { label: "خانه", onClick: () => goHome() },
+          { label: "ابزارها", onClick: () => goHome("tools") },
+          { label: TOOL_LABEL[view as Tool] },
+        ];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] pb-16 md:pb-0">
-      <Header />
-      <Breadcrumb
-        items={
-          view === "hub"
-            ? [
-                { label: "صفحه اصلی", onClick: goHub },
-                { label: "محاسبه‌گرها" },
-              ]
-            : [
-                { label: "صفحه اصلی", onClick: goHub },
-                { label: "ابزارها", onClick: goHub },
-                { label: "محاسبه مالیات", onClick: goHub },
-                { label: "مقایسه اظهارنامه و تبصره ۱۰۰" },
-              ]
-        }
-      />
+      <Header onHome={goHome} />
+      <Breadcrumb items={crumbs} />
       <main className="flex-1">
-        {view === "hub" ? (
-          <HubView onOpenCompare={goCompare} />
-        ) : (
-          <CompareCalculator onGoHub={goHub} />
-        )}
+        {view === "home" && <HomeView onOpenTool={openTool} />}
+        {view === "compare" && <CompareCalculator onGoHub={() => goHome()} />}
+        {view === "salary-tax" && <SalaryTaxCalculator onGoHome={() => goHome()} />}
+        {view === "payroll" && <PayrollCalculator onGoHome={() => goHome()} />}
+        {view === "check-due" && <CheckDueCalculator onGoHome={() => goHome()} />}
       </main>
       <Footer />
       <FloatingButtons />

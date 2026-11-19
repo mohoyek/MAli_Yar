@@ -1,154 +1,85 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Phone, ShoppingCart, ChevronDown, ChevronLeft } from "lucide-react";
+import { Phone, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
-const megaMenu: { label: string; children: string[] }[] = [
-  {
-    label: "خدمات و آموزش",
-    children: ["راوی‌پلاس", "خدمات مالیاتی", "خدمات حسابداری", "خدمات بیمه", "مشاوره", "وکیل", "دادرسی"],
-  },
-  {
-    label: "ابزارها",
-    children: ["محاسبه‌گرها", "جداول داده", "صفحات راهنما"],
-  },
-  {
-    label: "قوانین و بخشنامه‌ها",
-    children: ["قوانین مالیاتی", "بخشنامه‌ها", "آیین‌نامه‌ها", "آرای هیأت‌ها"],
-  },
-  {
-    label: "آزمون‌ها",
-    children: ["مشاوران رسمی", "حسابدار رسمی", "کانون وکلا", "آزمون‌های حسابداری"],
-  },
-  {
-    label: "جداول داده",
-    children: ["شناسه کالا و خدمات", "اینتاکد", "آیسیک", "کدینگ حسابداری"],
-  },
-  {
-    label: "وبلاگ",
-    children: ["آموزه‌های مالیاتی", "آموزه‌های حسابداری", "آموزه‌های اکسلی", "اخبار"],
-  },
+const NAV: { label: string; section?: string }[] = [
+  { label: "خانه", section: undefined },
+  { label: "خدمات", section: "services" },
+  { label: "ابزارها", section: "tools" },
+  { label: "قوانین و کدها", section: "laws" },
+  { label: "درباره ما", section: "about" },
+  { label: "تماس", section: "contact" },
 ];
 
-export function Header() {
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+export function Header({ onHome }: { onHome: (section?: string) => void }) {
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-slate-200/80 shadow-sm">
-      {/* Top row */}
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200/80 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 lg:px-8">
-        <div className="flex items-center gap-3 h-[72px]">
-          {/* Logo */}
-          <a href="#" className="flex items-center gap-2 shrink-0">
-            <span className="grid place-items-center h-10 w-10 rounded-xl bg-yellow-400 text-slate-900 font-extrabold text-lg shadow-sm">
+        <div className="flex items-center gap-3 h-16">
+          <button
+            onClick={() => onHome()}
+            className="flex items-center gap-2 shrink-0"
+            aria-label="مالی‌یار — خانه"
+          >
+            <span className="grid place-items-center h-9 w-9 rounded-xl bg-yellow-400 text-slate-900 font-extrabold shadow-sm">
               م
             </span>
             <span className="flex flex-col leading-none">
-              <span className="text-lg font-extrabold text-slate-900">مالی‌یار</span>
-              <span className="text-[10px] text-slate-500 tracking-wide">MALIYAR</span>
+              <span className="text-base font-extrabold text-slate-900">مالی‌یار</span>
+              <span className="text-[9px] text-slate-500 tracking-wide">
+                شرکت حسابداری و مالیاتی
+              </span>
             </span>
-          </a>
+          </button>
 
-          {/* Search */}
-          <div className="hidden md:flex flex-1 items-center gap-2 max-w-2xl">
-            <div className="flex items-stretch w-full rounded-full border border-slate-200 bg-slate-50 focus-within:bg-white focus-within:border-yellow-400 transition-colors">
-              <button className="flex items-center gap-1 px-3 text-sm text-slate-600 border-l border-slate-200">
-                همه <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-              <Input
-                placeholder="جستجو در مالی‌یار..."
-                className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 h-10"
-              />
-              <Button
-                size="sm"
-                className="m-1 rounded-full bg-yellow-400 text-slate-900 hover:bg-yellow-500 px-3"
+          <nav className="hidden md:flex items-center gap-1 mr-4">
+            {NAV.map((n) => (
+              <button
+                key={n.label}
+                onClick={() => onHome(n.section)}
+                className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors"
               >
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+                {n.label}
+              </button>
+            ))}
+          </nav>
 
           <div className="flex items-center gap-2 mr-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden lg:inline-flex rounded-full border-slate-300 text-slate-700 hover:bg-yellow-50 hover:border-yellow-400"
-            >
-              ورود | ثبت‌نام
-            </Button>
-            <button
-              className="grid place-items-center h-10 w-10 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 md:hidden"
-              aria-label="جستجو"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-            <button
-              className="hidden md:grid place-items-center h-10 w-10 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50"
-              aria-label="سبد خرید"
-            >
-              <ShoppingCart className="h-4 w-4" />
-            </button>
-            <a
-              href="tel:02100000000"
-              className="hidden sm:flex items-center gap-2 pr-2"
-            >
-              <span className="grid place-items-center h-10 w-10 rounded-full bg-yellow-100 text-yellow-700">
+            <a href="tel:02100000000" className="hidden sm:flex items-center gap-2">
+              <span className="grid place-items-center h-9 w-9 rounded-full bg-yellow-100 text-yellow-700">
                 <Phone className="h-4 w-4" />
               </span>
               <span className="flex flex-col leading-tight">
-                <span className="text-[11px] text-slate-500">مشاوره و پشتیبانی</span>
+                <span className="text-[10px] text-slate-500">مشاوره رایگان</span>
                 <span dir="ltr" className="text-sm font-bold text-slate-900">
                   ۰۲۱-۰۰۰۰۰۰۰۰
                 </span>
               </span>
             </a>
+            <Button
+              onClick={() => onHome("contact")}
+              size="sm"
+              className="bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-full"
+            >
+              درخواست مشاوره
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Secondary nav with mega menu */}
-      <nav className="border-t border-slate-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8">
-          <ul className="flex items-center gap-1 h-12 overflow-x-auto scrollbar-none whitespace-nowrap">
-            {megaMenu.map((item) => (
-              <li
-                key={item.label}
-                className="relative"
-                onMouseEnter={() => setActiveMenu(item.label)}
-                onMouseLeave={() => setActiveMenu(null)}
-              >
-                <button
-                  className={`flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors rounded-md ${
-                    item.label === "ابزارها"
-                      ? "text-slate-900"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {item.label}
-                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                </button>
-                {item.label === "ابزارها" && (
-                  <span className="absolute -bottom-[1px] right-3 left-3 h-[3px] bg-yellow-400 rounded-full" />
-                )}
-                {activeMenu === item.label && (
-                  <div className="absolute top-full right-0 mt-0 w-56 bg-white rounded-xl border border-slate-200 shadow-xl p-2 z-50">
-                    {item.children.map((c) => (
-                      <a
-                        key={c}
-                        href="#"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-yellow-50 hover:text-slate-900 rounded-lg transition-colors"
-                      >
-                        {c}
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </nav>
+        {/* Mobile nav */}
+        <nav className="md:hidden flex items-center gap-1 overflow-x-auto whitespace-nowrap pb-2 -mt-1 scrollbar-none">
+          {NAV.map((n) => (
+            <button
+              key={n.label}
+              onClick={() => onHome(n.section)}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors"
+            >
+              {n.label}
+            </button>
+          ))}
+        </nav>
+      </div>
     </header>
   );
 }

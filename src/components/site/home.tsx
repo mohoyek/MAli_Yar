@@ -15,6 +15,7 @@ import {
   Briefcase,
   Barcode,
   CalendarDays,
+  Table2,
   Phone,
   Mail,
   MapPin,
@@ -43,7 +44,7 @@ import {
 } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 
-export type Tool = "compare" | "salary-tax" | "payroll" | "check-due";
+export type Tool = "compare" | "salary-tax" | "payroll" | "check-due" | "intacode";
 
 const services = [
   {
@@ -105,7 +106,16 @@ const tools: { id: Tool; icon: typeof Calculator; title: string; desc: string }[
   },
 ];
 
-const lawGroups = [
+type LawGroup = {
+  icon: typeof FileText;
+  title: string;
+  items: string[];
+  href?: string;
+  linkLabel: string;
+  internalTool?: Tool;
+};
+
+const lawGroups: LawGroup[] = [
   {
     icon: FileText,
     title: "قوانین مالیاتی",
@@ -133,6 +143,13 @@ const lawGroups = [
     items: ["مصوبات دستمزد سالانه", "ارقام سالانه مالیات", "ارزش اجرای املاک", "ضریب حق بیمه"],
     href: "https://www.mporg.ir",
     linkLabel: "مرکز پژوهش‌های مجلس",
+  },
+  {
+    icon: Table2,
+    title: "جدول اینتاکد و ضرایب سود فعالیت",
+    items: ["ضرایب سود فعالیت ۱۴۰۵", "جستجوی عنوان فعالیت", "بخش‌بندی مشاغل"],
+    internalTool: "intacode",
+    linkLabel: "مشاهده جدول",
   },
 ];
 
@@ -279,7 +296,7 @@ export function HomeView({ onOpenTool }: { onOpenTool: (t: Tool) => void }) {
 
       {/* Laws & Codes */}
       <Section id="laws" title="قوانین، کدها و ارقام" subtitle="دسترسی سریع به منابع رسمی حوزه مالیات، کار و بیمه">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {lawGroups.map((g) => (
             <div key={g.title} className="bg-white rounded-2xl border border-slate-200 p-6">
               <div className="grid place-items-center h-10 w-10 rounded-lg bg-slate-900 text-yellow-400">
@@ -294,14 +311,23 @@ export function HomeView({ onOpenTool }: { onOpenTool: (t: Tool) => void }) {
                   </li>
                 ))}
               </ul>
-              <a
-                href={g.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 text-xs font-medium text-yellow-700 hover:text-yellow-800 inline-flex items-center gap-1"
-              >
-                {g.linkLabel} <ArrowLeft className="h-3 w-3" />
-              </a>
+              {g.internalTool ? (
+                <button
+                  onClick={() => onOpenTool(g.internalTool)}
+                  className="mt-4 text-xs font-medium text-yellow-700 hover:text-yellow-800 inline-flex items-center gap-1"
+                >
+                  {g.linkLabel} <ArrowLeft className="h-3 w-3" />
+                </button>
+              ) : (
+                <a
+                  href={g.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 text-xs font-medium text-yellow-700 hover:text-yellow-800 inline-flex items-center gap-1"
+                >
+                  {g.linkLabel} <ArrowLeft className="h-3 w-3" />
+                </a>
+              )}
             </div>
           ))}
         </div>

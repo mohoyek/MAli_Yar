@@ -8,6 +8,7 @@ import { CompareCalculator } from "@/components/site/compare";
 import { SalaryTaxCalculator } from "@/components/site/salary-tax";
 import { PayrollCalculator } from "@/components/site/payroll";
 import { CheckDueCalculator } from "@/components/site/check-due";
+import { IntacodeView } from "@/components/site/intacode";
 
 type View = "home" | Tool;
 
@@ -16,6 +17,7 @@ const TOOL_LABEL: Record<Tool, string> = {
   "salary-tax": "محاسبه مالیات حقوق",
   payroll: "محاسبه حقوق و دستمزد",
   "check-due": "راس‌گیری چک",
+  intacode: "جدول اینتاکد و ضرایب سود فعالیت",
 };
 
 export default function Page() {
@@ -56,6 +58,7 @@ export default function Page() {
         {view === "salary-tax" && <SalaryTaxCalculator onGoHome={() => goHome()} />}
         {view === "payroll" && <PayrollCalculator onGoHome={() => goHome()} />}
         {view === "check-due" && <CheckDueCalculator onGoHome={() => goHome()} />}
+        {view === "intacode" && <IntacodeView onGoHome={() => goHome()} />}
       </main>
       <Footer />
       <FloatingButtons />

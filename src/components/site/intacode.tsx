@@ -8,6 +8,8 @@ import {
   Search,
   ExternalLink,
   Table2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +20,18 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { faNum, faPercent, toLatinDigits } from "@/lib/format";
+import { faNum, faNumDec, toLatinDigits } from "@/lib/format";
 import {
   INTACODE_ENTRIES,
   INTACODE_SECTORS,
   INTACODE_YEAR,
-  INTACODE_NOTE,
+  INTACODE_COUNT,
 } from "@/data/intacode";
+
+const ENTRIES_PER_PAGE = 50;
+
+const INTACODE_NOTE =
+  "این جدول شامل داده‌های کامل ضریب سود فعالیت (اینتاکد) است که از دفترچه رسمی سازمان امور مالیاتی کشور برای سال عملکرد ۱۴۰۴ استخراج شده است. این داده‌ها شامل هر دو نسبت «سود فعالیت» و «سود ناویژه» برای هر کد فعالیت در بخش‌های تولید، بازرگانی و خدمات است.";
 
 const faqItems = [
   {
@@ -32,22 +39,23 @@ const faqItems = [
     a: "اینتاکد (کد طبقه‌بندی فعالیت اقتصادی) شناسه‌ای است که سازمان امور مالیاتی به هر فعالیت اقتصادی اختصاص می‌دهد و همراه با «ضریب سود فعالیت» برای محاسبه مالیات مقطوع تبصره ۱۰۰ به‌کار می‌رود.",
   },
   {
-    q: "ضریب سود فعالیت چیست؟",
-    a: "ضریب سود فعالیت نسبت پیش‌فرض سود به فروش است که سازمان مالیات برای هر فعالیت تعیین می‌کند. در روش تبصره ۱۰۰، درآمد مشمول برابر است با فروش ضربدر ضریب سود فعالیت.",
+    q: "نسبت سود فعالیت چیست؟",
+    a: "نسبت سود فعالیت درصد پیش‌فرض سود به فروش است که سازمان مالیات برای هر فعالیت تعیین می‌کند. در روش تبصره ۱۰۰، درآمد مشمول برابر است با فروش ضربدر نسبت سود فعالیت.",
   },
   {
-    q: "این فهرست کامل است؟",
-    a: "خیر؛ این فهرست گزیده‌ای از مشاغل رایج برای برآورد اولیه است. جدول کامل رسمی سالانه در سایت سازمان امور مالیاتی کشور قابل استعلام است و ضریب دقیق هر فعالیت ممکن است متفاوت باشد.",
+    q: "نسبت سود ناویژه چیست؟",
+    a: "نسبت سود ناویژه نسبت سود به فروش قبل از کسر هزینه‌های مالیاتی است و معمولاً بالاتر از نسبت سود فعالیت است. این نسبت برای محاسبات داخلی و مقایسه استفاده می‌شود.",
   },
   {
-    q: "ضریب دقیق شغل خود را از کجا بیاورم؟",
-    a: "ضریب دقیق را از جدول اینتاکد سازمان امور مالیاتی استعلام کنید. در ماشین‌حساب «مقایسه اظهارنامه و تبصره ۱۰۰» هم می‌توانید ضریب را به‌صورت دستی وارد کنید تا محاسبه دقیق‌تر باشد.",
+    q: "این داده‌ها از کجا آمده‌اند؟",
+    a: "داده‌ها از دفترچه رسمی ضرایب سود فعالیت سازمان امور مالیاتی کشور برای سال عملکرد ۱۴۰۴ استخراج شده‌اند. ضریب دقیق هر فعالیت را می‌توانید از سایت سازمان امور مالیاتی نیز استعلام کنید.",
   },
 ];
 
 export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState<string>("");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     const q = toLatinDigits(query).trim().toLowerCase();
@@ -57,10 +65,35 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
       return (
         e.title.toLowerCase().includes(q) ||
         e.sector.toLowerCase().includes(q) ||
-        String(e.coefficient).includes(q)
+        e.code.includes(q) ||
+        String(e.coefficient ?? "").includes(q) ||
+        String(e.grossCoefficient ?? "").includes(q)
       );
     });
   }, [query, sector]);
+
+  const totalPages = Math.ceil(filtered.length / ENTRIES_PER_PAGE);
+  const currentPage = Math.min(page, totalPages || 1);
+  const start = (currentPage - 1) * ENTRIES_PER_PAGE;
+  const pageEntries = filtered.slice(start, start + ENTRIES_PER_PAGE);
+
+  // Reset page when filters change
+  function onSearchChange(v: string) {
+    setQuery(v);
+    setPage(1);
+  }
+  function onSectorChange(s: string) {
+    setSector(s);
+    setPage(1);
+  }
+
+  const sectorCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of INTACODE_ENTRIES) {
+      counts[e.sector] = (counts[e.sector] ?? 0) + 1;
+    }
+    return counts;
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -77,20 +110,20 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
               </button>
               <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 px-3 py-1 rounded-full text-xs font-medium">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-500 ml-1" />
-                مرجع — جدول اینتاکد و ضرایب سود فعالیت
+                مرجع کامل — جدول اینتاکد و ضرایب سود فعالیت {INTACODE_YEAR}
               </Badge>
               <h1 className="mt-4 text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight">
-                جدول <mark className="bg-yellow-300 text-slate-900 px-2 rounded-md">اینتاکد</mark> و ضرایب سود فعالیت {INTACODE_YEAR}
+                جدول کامل <mark className="bg-yellow-300 text-slate-900 px-2 rounded-md">اینتاکد</mark> و ضرایب سود فعالیت {INTACODE_YEAR}
               </h1>
               <p className="mt-4 text-slate-600 text-sm md:text-base max-w-2xl leading-7">
-                گزیده‌ای از ضرایب سود فعالیت (اینتاکد) مشاغل رایج برای برآورد
-                مالیات تبصره ۱۰۰. عنوان فعالیت را جستجو کنید یا بر اساس بخش فیلتر
-                کنید.
+                داده‌های کامل ضریب سود فعالیت (اینتاکد) برای سال عملکرد {INTACODE_YEAR} —
+                شامل {faNum(INTACODE_COUNT)} کد فعالیت در بخش‌های تولید، بازرگانی و خدمات.
+                کد فعالیت، عنوان، نسبت سود فعالیت و نسبت سود ناویژه را جستجو کنید.
               </p>
               <div className="mt-6 flex flex-wrap gap-6">
-                <Stat value={faNum(INTACODE_ENTRIES.length)} label="فعالیت در فهرست" />
+                <Stat value={faNum(INTACODE_COUNT)} label="کد فعالیت" />
                 <Stat value={faNum(INTACODE_SECTORS.length)} label="بخش فعالیت" />
-                <Stat value={INTACODE_YEAR} label="سال" />
+                <Stat value={INTACODE_YEAR} label="سال عملکرد" />
               </div>
             </div>
           </div>
@@ -100,73 +133,113 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
       <section id="calc" className="pb-8 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 lg:px-8">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+            {/* Search */}
             <div className="flex flex-col md:flex-row gap-3 md:items-center">
               <div className="relative flex-1">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="جستجوی عنوان فعالیت، بخش یا ضریب…"
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  placeholder="جستجوی کد، عنوان فعالیت، بخش یا ضریب…"
                   className="h-11 pr-9"
                 />
               </div>
             </div>
+
+            {/* Sector filter */}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
-                onClick={() => setSector("")}
+                onClick={() => onSectorChange("")}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                   sector === ""
                     ? "bg-yellow-400 text-slate-900 border-yellow-400"
                     : "bg-white text-slate-600 border-slate-200 hover:border-yellow-300"
                 }`}
               >
-                همه بخش‌ها
+                همه بخش‌ها ({faNum(INTACODE_COUNT)})
               </button>
               {INTACODE_SECTORS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => setSector(s)}
+                  onClick={() => onSectorChange(s)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                     sector === s
                       ? "bg-yellow-400 text-slate-900 border-yellow-400"
                       : "bg-white text-slate-600 border-slate-200 hover:border-yellow-300"
                   }`}
                 >
-                  {s}
+                  {s} ({faNum(sectorCounts[s] ?? 0)})
                 </button>
               ))}
             </div>
 
-            <div className="mt-4 text-xs text-slate-500">
-              {faNum(filtered.length)} فعالیت یافت شد
+            {/* Results count */}
+            <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+              <span>
+                {faNum(filtered.length)} فعالیت — صفحه {faNum(currentPage)} از {faNum(totalPages || 1)}
+              </span>
+              {filtered.length > ENTRIES_PER_PAGE && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
+                    className="grid place-items-center h-8 w-8 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <span className="tabular-nums">{faNum(currentPage)} / {faNum(totalPages)}</span>
+                  <button
+                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="grid place-items-center h-8 w-8 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
+            {/* Table */}
             <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs">
                   <tr>
-                    <th className="text-right px-4 py-3 font-medium">عنوان فعالیت</th>
-                    <th className="text-right px-4 py-3 font-medium">بخش</th>
-                    <th className="text-left px-4 py-3 font-medium">ضریب سود فعالیت</th>
-                    <th className="text-left px-4 py-3 font-medium">سال</th>
+                    <th className="text-right px-3 py-3 font-medium whitespace-nowrap">کد یونیک</th>
+                    <th className="text-right px-3 py-3 font-medium">شرح فعالیت</th>
+                    <th className="text-right px-3 py-3 font-medium whitespace-nowrap">بخش</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">سود فعالیت (٪)</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">سود ناویژه (٪)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map((e, i) => (
-                    <tr key={i} className="hover:bg-yellow-50/40">
-                      <td className="px-4 py-3 text-slate-800">{e.title}</td>
-                      <td className="px-4 py-3 text-slate-600 text-xs">{e.sector}</td>
-                      <td className="px-4 py-3 text-left">
-                        <span className="inline-block px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold tabular-nums">
-                          {faPercent(e.coefficient / 100, 0)}
-                        </span>
+                  {pageEntries.map((e) => (
+                    <tr key={e.code} className="hover:bg-yellow-50/40">
+                      <td className="px-3 py-2.5 text-slate-500 tabular-nums text-xs whitespace-nowrap" dir="ltr">{e.code}</td>
+                      <td className="px-3 py-2.5 text-slate-800 text-xs leading-5">{e.title}</td>
+                      <td className="px-3 py-2.5 text-slate-600 text-xs whitespace-nowrap">{e.sector}</td>
+                      <td className="px-3 py-2.5 text-left">
+                        {e.coefficient != null ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold tabular-nums">
+                            {faNumDec(e.coefficient, 2)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-left tabular-nums text-slate-600">{e.year}</td>
+                      <td className="px-3 py-2.5 text-left">
+                        {e.grossCoefficient != null ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-medium tabular-nums">
+                            {faNumDec(e.grossCoefficient, 2)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
-                  {filtered.length === 0 && (
+                  {pageEntries.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-sm">
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-sm">
                         نتیجه‌ای یافت نشد — عبارت دیگری را امتحان کنید.
                       </td>
                     </tr>
@@ -175,6 +248,33 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
               </table>
             </div>
 
+            {/* Pagination footer */}
+            {filtered.length > ENTRIES_PER_PAGE && (
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span>
+                  نمایش {faNum(start + 1)} تا {faNum(Math.min(start + ENTRIES_PER_PAGE, filtered.length))} از {faNum(filtered.length)}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+                  >
+                    قبلی
+                  </button>
+                  <span className="tabular-nums">{faNum(currentPage)} / {faNum(totalPages)}</span>
+                  <button
+                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+                  >
+                    بعدی
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Note */}
             <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-4">
               <p className="text-xs text-slate-600 leading-6 flex items-start gap-1">
                 <Info className="h-4 w-4 shrink-0 mt-0.5 text-yellow-600" /> {INTACODE_NOTE}
@@ -194,16 +294,13 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
         </div>
       </section>
 
+      {/* FAQ */}
       <section className="pb-12">
         <div className="max-w-3xl mx-auto px-4 lg:px-8">
           <h2 className="text-xl font-extrabold text-slate-900 mb-4 flex items-center gap-2">
             <HelpCircle className="h-5 w-5 text-yellow-500" /> سوالات متداول
           </h2>
-          <Accordion
-            type="single"
-            collapsible
-            className="bg-white rounded-2xl border border-slate-200 px-4"
-          >
+          <Accordion type="single" collapsible className="bg-white rounded-2xl border border-slate-200 px-4">
             {faqItems.map((f, i) => (
               <AccordionItem key={i} value={`i${i}`}>
                 <AccordionTrigger className="text-right text-sm font-medium">{f.q}</AccordionTrigger>

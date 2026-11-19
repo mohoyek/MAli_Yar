@@ -17,6 +17,8 @@ import {
   User,
   TrendingUp,
   TrendingDown,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,8 +42,26 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { faNum, faPercent, parseMoney } from "@/lib/format";
+import { faNum, faPercent, parseMoney, toLatinDigits } from "@/lib/format";
+import {
+  INTACODE_ENTRIES,
+  INTACODE_SECTORS,
+  type IntacodeEntry,
+} from "@/data/intacode";
 import {
   INCOME_BRACKETS,
   INCOME_EXEMPTION,
@@ -203,7 +223,13 @@ type IncomeFormState = {
   name: string;
   nationalId: string;
   economicCode: string;
-  activityType: "production" | "commerce" | "services";
+  // فعالیت (اینتاکد)
+  intacodeCode: string;
+  intacodeTitle: string;
+  intacodeSector: string;
+  intacodeCoefficient: number | null;
+  intacodeGrossCoefficient: number | null;
+  intacodeYear: string; // سال مرجع اینتاکد (ممکن است با سال اظهارنامه متفاوت باشد)
   province: string;
   year: TaxYear;
   // درآمد
@@ -225,7 +251,12 @@ const INCOME_INITIAL: IncomeFormState = {
   name: "",
   nationalId: "",
   economicCode: "",
-  activityType: "services",
+  intacodeCode: "",
+  intacodeTitle: "",
+  intacodeSector: "",
+  intacodeCoefficient: null,
+  intacodeGrossCoefficient: null,
+  intacodeYear: "",
   province: "تهران",
   year: "1405",
   salesRevenue: "",
@@ -292,13 +323,22 @@ function IncomeDeclaration() {
   }
 
   function loadSample() {
+    // نمونه: یک کد خدمات از سال 1404
+    const sample = INTACODE_ENTRIES.find(
+      (e) => e.year === "1404" && e.sector === "خدمات" && e.code === "1106031"
+    ) ?? INTACODE_ENTRIES.find((e) => e.year === "1404" && e.sector === "خدمات");
     setForm({
       ...INCOME_INITIAL,
       name: "شرکت نمونه — بخش خدمات",
       nationalId: "۱۴۰۰۱۲۳۴۵۶۷",
       economicCode: "۴۱۱۲۲۳۳۴۴۵۵۶",
       personType: "legal",
-      activityType: "services",
+      intacodeCode: sample?.code ?? "",
+      intacodeTitle: sample?.title ?? "",
+      intacodeSector: sample?.sector ?? "",
+      intacodeCoefficient: sample?.coefficient ?? null,
+      intacodeGrossCoefficient: sample?.grossCoefficient ?? null,
+      intacodeYear: sample?.year ?? "",
       salesRevenue: "12,000,000,000",
       exportRevenue: "0",
       otherIncome: "300,000,000",
@@ -371,16 +411,29 @@ function IncomeDeclaration() {
                   dir="ltr"
                 />
               </Field>
-              <Field label="نوع فعالیت">
-                <Select value={form.activityType} onValueChange={(v) => update("activityType", v as IncomeFormState["activityType"])}>
-                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="production">تولیدی</SelectItem>
-                    <SelectItem value="commerce">بازرگانی</SelectItem>
-                    <SelectItem value="services">خدماتی</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
+              <IntacodeSearch
+                value={{
+                  code: form.intacodeCode,
+                  title: form.intacodeTitle,
+                  sector: form.intacodeSector,
+                  coefficient: form.intacodeCoefficient,
+                  grossCoefficient: form.intacodeGrossCoefficient,
+                  year: form.intacodeYear,
+                }}
+                preferredYear={form.year === "1405" ? "1404" : form.year}
+                onChange={(entry) => {
+                  setForm((f) => ({
+                    ...f,
+                    intacodeCode: entry?.code ?? "",
+                    intacodeTitle: entry?.title ?? "",
+                    intacodeSector: entry?.sector ?? "",
+                    intacodeCoefficient: entry?.coefficient ?? null,
+                    intacodeGrossCoefficient: entry?.grossCoefficient ?? null,
+                    intacodeYear: entry?.year ?? "",
+                  }));
+                  setShowResult(false);
+                }}
+              />
               <Field label="استان محل فعالیت">
                 <Input
                   value={form.province}
@@ -399,6 +452,32 @@ function IncomeDeclaration() {
                 </Select>
               </Field>
             </div>
+
+            {/* نمایش فعالیت انتخاب‌شده + ضریب سود */}
+            {form.intacodeCode && (
+              <div className="mt-4 rounded-xl bg-yellow-50 border border-yellow-200 p-4">
+                <div className="flex items-start gap-3 flex-wrap">
+                  <Badge className="bg-yellow-400 text-slate-900 border-yellow-400 hover:bg-yellow-400 px-2.5 py-1 rounded-full text-xs font-bold tabular-nums" dir="ltr">
+                    {form.intacodeCode}
+                  </Badge>
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="text-sm font-bold text-slate-900 leading-6">
+                      {form.intacodeTitle}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                      <span>بخش: <b className="text-slate-800">{form.intacodeSector}</b></span>
+                      {form.intacodeCoefficient != null && (
+                        <span>ضریب سود فعالیت: <b className="text-yellow-800 tabular-nums">{faPercent(form.intacodeCoefficient / 100, 2)}</b></span>
+                      )}
+                      {form.intacodeGrossCoefficient != null && (
+                        <span>سود ناویژه: <b className="text-slate-800 tabular-nums">{faPercent(form.intacodeGrossCoefficient / 100, 2)}</b></span>
+                      )}
+                      <span>سال مرجع اینتاکد: <b className="text-slate-800">{form.intacodeYear}</b></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </FormSection>
 
           {/* Section: درآمد */}
@@ -1292,5 +1371,237 @@ function OutputRowVAT({
         {faNum(vat)}
       </td>
     </tr>
+  );
+}
+
+/* ========================================================================== */
+/*  IntacodeSearch — combobox قابل جستجو برای انتخاب فعالیت از جدول اینتاکد    */
+/* ========================================================================== */
+
+type IntacodeSearchValue = {
+  code: string;
+  title: string;
+  sector: string;
+  coefficient: number | null;
+  grossCoefficient: number | null;
+  year: string;
+};
+
+const MAX_RESULTS = 60;
+
+function IntacodeSearch({
+  value,
+  preferredYear,
+  onChange,
+}: {
+  value: IntacodeSearchValue | null;
+  preferredYear: string;
+  onChange: (entry: IntacodeEntry | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sector, setSector] = useState<string>("");
+
+  // اگر سال اظهارنامه ۱۴۰۵ باشد، هنوز اینتاکد رسمی منتشر نشده — از ۱۴۰۴ استفاده می‌کنیم
+  const yearData = useMemo(() => {
+    const y = INTACODE_ENTRIES.some((e) => e.year === preferredYear)
+      ? preferredYear
+      : "1404";
+    return INTACODE_ENTRIES.filter((e) => e.year === y);
+  }, [preferredYear]);
+
+  const filtered = useMemo(() => {
+    const q = toLatinDigits(query).trim().toLowerCase();
+    let list = yearData;
+    if (sector) list = list.filter((e) => e.sector === sector);
+    if (q.length >= 2) {
+      list = list.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          e.code.includes(q) ||
+          String(e.coefficient ?? "").includes(q)
+      );
+    } else if (q.length > 0 && q.length < 2) {
+      // با یک حرف چیزی نشان نده تا performance حفظ شود
+      return [];
+    }
+    return list.slice(0, MAX_RESULTS);
+  }, [yearData, query, sector]);
+
+  const sectorCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of yearData) counts[e.sector] = (counts[e.sector] ?? 0) + 1;
+    return counts;
+  }, [yearData]);
+
+  const totalMatches = useMemo(() => {
+    const q = toLatinDigits(query).trim().toLowerCase();
+    if (q.length < 2) return yearData.length;
+    let list = yearData;
+    if (sector) list = list.filter((e) => e.sector === sector);
+    return list.filter(
+      (e) =>
+        e.title.toLowerCase().includes(q) ||
+        e.code.includes(q) ||
+        String(e.coefficient ?? "").includes(q)
+    ).length;
+  }, [yearData, query, sector]);
+
+  function handleSelect(entry: IntacodeEntry) {
+    onChange(entry);
+    setOpen(false);
+    setQuery("");
+    setSector("");
+  }
+
+  function handleClear(e: React.MouseEvent) {
+    e.stopPropagation();
+    onChange(null);
+  }
+
+  const selectedYearLabel = yearData[0]?.year ?? preferredYear;
+
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-600 mb-1.5">
+        نوع فعالیت (جستجو در اینتاکد — سال {selectedYearLabel})
+      </label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full h-11 px-3 flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white text-sm hover:border-slate-300 transition-colors text-right"
+          >
+            {value && value.code ? (
+              <span className="flex items-center gap-2 flex-1 min-w-0">
+                <Badge
+                  className="bg-yellow-400 text-slate-900 border-yellow-400 hover:bg-yellow-400 px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums shrink-0"
+                  dir="ltr"
+                >
+                  {value.code}
+                </Badge>
+                <span className="text-slate-700 truncate text-xs">{value.title}</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 text-slate-400 text-sm">
+                <Search className="h-4 w-4 shrink-0" />
+                جستجوی کد / عنوان فعالیت…
+              </span>
+            )}
+            <span className="flex items-center gap-1 shrink-0">
+              {value && value.code && (
+                <span
+                  onClick={handleClear}
+                  className="grid place-items-center h-6 w-6 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="پاک کردن"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <ChevronLeft
+                className={`h-4 w-4 text-slate-400 transition-transform ${open ? "-rotate-90" : ""}`}
+              />
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-[--radix-popover-trigger-width] min-w-[320px] md:min-w-[480px] p-0"
+          align="start"
+          sideOffset={6}
+        >
+          <Command shouldFilter={false} className="rounded-lg">
+            <CommandInput
+              placeholder="حداقل ۲ حرف از کد یا عنوان فعالیت را وارد کنید…"
+              value={query}
+              onValueChange={setQuery}
+            />
+            {/* فیلتر بخش */}
+            <div className="px-2 pt-2 pb-1 flex items-center gap-1 flex-wrap border-b border-slate-100">
+              <span className="text-[10px] text-slate-500 ml-1">بخش:</span>
+              <button
+                type="button"
+                onClick={() => setSector("")}
+                className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                  sector === ""
+                    ? "bg-yellow-400 text-slate-900 border-yellow-400"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                }`}
+              >
+                همه ({faNum(yearData.length)})
+              </button>
+              {INTACODE_SECTORS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSector(s)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                    sector === s
+                      ? "bg-yellow-400 text-slate-900 border-yellow-400"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                  }`}
+                >
+                  {s} ({faNum(sectorCounts[s] ?? 0)})
+                </button>
+              ))}
+            </div>
+            <CommandList>
+              {filtered.length === 0 ? (
+                <CommandEmpty>
+                  {query.length < 2
+                    ? "حداقل ۲ حرف تایپ کنید…"
+                    : "نتیجه‌ای یافت نشد — عبارت دیگری را امتحان کنید."}
+                </CommandEmpty>
+              ) : (
+                <CommandGroup>
+                  {filtered.map((e) => (
+                    <CommandItem
+                      key={`${e.code}-${e.year}`}
+                      value={`${e.code} ${e.title}`}
+                      onSelect={() => handleSelect(e)}
+                      className="flex items-start gap-2 py-2"
+                    >
+                      <Badge
+                        className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums shrink-0 mt-0.5"
+                        dir="ltr"
+                      >
+                        {e.code}
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-slate-800 leading-5 line-clamp-2">
+                          {e.title}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+                          <span>{e.sector}</span>
+                          {e.coefficient != null && (
+                            <span className="tabular-nums">
+                              ضریب: <b className="text-yellow-700">{faPercent(e.coefficient / 100, 2)}</b>
+                            </span>
+                          )}
+                          {e.grossCoefficient != null && (
+                            <span className="tabular-nums">
+                              ناویژه: <b className="text-slate-700">{faPercent(e.grossCoefficient / 100, 2)}</b>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+            {/* فوتر شمارش */}
+            <div className="px-3 py-2 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between">
+              <span>
+                نمایش {faNum(filtered.length)} از {faNum(totalMatches)} فعالیت
+                {totalMatches > MAX_RESULTS && " (افزون بر ۶۰ نتیجه نمایش داده نمی‌شود)"}
+              </span>
+              <span>سال مرجع: {selectedYearLabel}</span>
+            </div>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

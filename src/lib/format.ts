@@ -44,6 +44,23 @@ export function parseMoney(s: string): number {
   return isNaN(n) ? 0 : n;
 }
 
+/**
+ * Group a number string for live input display.
+ * Takes any user input (Latin/Persian digits, with/without separators),
+ * extracts digits, and re-formats with Persian locale grouping (٬).
+ * Returns "" if there are no digits. Output is RTL Persian digits, e.g. "۱۲٬۰۰۰٬۰۰۰٬۰۰۰".
+ */
+export function formatGrouped(s: string): string {
+  const latin = toLatinDigits(String(s ?? ""));
+  const digits = latin.replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  // Strip leading zeros for cleaner display, but keep at least one digit
+  const cleaned = digits.replace(/^0+(?=\d)/, "");
+  const n = Number(cleaned || "0");
+  if (!isFinite(n)) return "";
+  return new Intl.NumberFormat("fa-IR").format(n);
+}
+
 export function faPercent(rate: number, max = 2): string {
   return faNumDec(rate * 100, max) + "٪";
 }

@@ -56,7 +56,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { faNum, faPercent, parseMoney, toLatinDigits } from "@/lib/format";
+import { faNum, faPercent, parseMoney, toLatinDigits, formatGrouped } from "@/lib/format";
 import {
   INTACODE_ENTRIES,
   INTACODE_SECTORS,
@@ -1238,13 +1238,23 @@ function MoneyField({
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  // نمایش زنده با جداکننده هزارگان (Persian grouping) — ذخیره‌ی raw digits در state
+  const displayValue = value ? formatGrouped(value) : "";
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    // کاربر ممکن است Persian/Arabic digits یا کاما/فاصله تایپ کند — همه را به digit لاتین تبدیل کن
+    const digits = toLatinDigits(raw).replace(/[^0-9]/g, "");
+    onChange(digits);
+  }
+
   return (
     <div>
       <label className="block text-xs font-medium text-slate-600 mb-1.5">{label}</label>
       <Input
         inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={displayValue}
+        onChange={handleChange}
         placeholder={placeholder}
         className="h-11 text-sm tabular-nums"
         dir="ltr"

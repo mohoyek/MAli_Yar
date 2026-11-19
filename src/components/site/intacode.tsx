@@ -24,14 +24,15 @@ import { faNum, faNumDec, toLatinDigits } from "@/lib/format";
 import {
   INTACODE_ENTRIES,
   INTACODE_SECTORS,
-  INTACODE_YEAR,
+  INTACODE_YEARS,
   INTACODE_COUNT,
+  INTACODE_YEAR_COUNTS,
 } from "@/data/intacode";
 
 const ENTRIES_PER_PAGE = 50;
 
 const INTACODE_NOTE =
-  "این جدول شامل داده‌های کامل ضریب سود فعالیت (اینتاکد) است که از دفترچه رسمی سازمان امور مالیاتی کشور برای سال عملکرد ۱۴۰۴ استخراج شده است. این داده‌ها شامل هر دو نسبت «سود فعالیت» و «سود ناویژه» برای هر کد فعالیت در بخش‌های تولید، بازرگانی و خدمات است.";
+  "این جدول شامل داده‌های کامل ضریب سود فعالیت (اینتاکد) است که از دفترچه رسمی سازمان امور مالیاتی کشور برای سال‌های عملکرد ۱۴۰۲، ۱۴۰۳ و ۱۴۰۴ استخراج شده است. هر کد فعالیت شامل هر دو نسبت «سود فعالیت» و «سود ناویژه» در بخش‌های تولید، بازرگانی و خدمات است. با انتخابگر سال می‌توانید ضرایب هر سال را جداگانه بررسی و مقایسه کنید.";
 
 const faqItems = [
   {
@@ -48,18 +49,20 @@ const faqItems = [
   },
   {
     q: "این داده‌ها از کجا آمده‌اند؟",
-    a: "داده‌ها از دفترچه رسمی ضرایب سود فعالیت سازمان امور مالیاتی کشور برای سال عملکرد ۱۴۰۴ استخراج شده‌اند. ضریب دقیق هر فعالیت را می‌توانید از سایت سازمان امور مالیاتی نیز استعلام کنید.",
+    a: "داده‌ها از دفترچه رسمی ضرایب سود فعالیت سازمان امور مالیاتی کشور برای سال‌های عملکرد ۱۴۰۲، ۱۴۰۳ و ۱۴۰۴ استخراج شده‌اند. ضریب دقیق هر فعالیت را می‌توانید از سایت سازمان امور مالیاتی نیز استعلام کنید.",
   },
 ];
 
 export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState<string>("");
+  const [year, setYear] = useState<string>(INTACODE_YEARS[0]);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     const q = toLatinDigits(query).trim().toLowerCase();
     return INTACODE_ENTRIES.filter((e) => {
+      if (e.year !== year) return false;
       if (sector && e.sector !== sector) return false;
       if (!q) return true;
       return (
@@ -70,7 +73,7 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
         String(e.grossCoefficient ?? "").includes(q)
       );
     });
-  }, [query, sector]);
+  }, [query, sector, year]);
 
   const totalPages = Math.ceil(filtered.length / ENTRIES_PER_PAGE);
   const currentPage = Math.min(page, totalPages || 1);
@@ -86,14 +89,21 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
     setSector(s);
     setPage(1);
   }
+  function onYearChange(y: string) {
+    setYear(y);
+    setPage(1);
+  }
+
+  const yearCount = INTACODE_YEAR_COUNTS[year] ?? 0;
 
   const sectorCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const e of INTACODE_ENTRIES) {
+      if (e.year !== year) continue;
       counts[e.sector] = (counts[e.sector] ?? 0) + 1;
     }
     return counts;
-  }, []);
+  }, [year]);
 
   return (
     <div className="min-h-screen">
@@ -110,20 +120,20 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
               </button>
               <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 px-3 py-1 rounded-full text-xs font-medium">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-500 ml-1" />
-                مرجع کامل — جدول اینتاکد و ضرایب سود فعالیت {INTACODE_YEAR}
+                مرجع کامل — جدول اینتاکد و ضرایب سود فعالیت (۱۴۰۲-۱۴۰۴)
               </Badge>
               <h1 className="mt-4 text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight">
-                جدول کامل <mark className="bg-yellow-300 text-slate-900 px-2 rounded-md">اینتاکد</mark> و ضرایب سود فعالیت {INTACODE_YEAR}
+                جدول کامل <mark className="bg-yellow-300 text-slate-900 px-2 rounded-md">اینتاکد</mark> و ضرایب سود فعالیت (۱۴۰۲-۱۴۰۴)
               </h1>
               <p className="mt-4 text-slate-600 text-sm md:text-base max-w-2xl leading-7">
-                داده‌های کامل ضریب سود فعالیت (اینتاکد) برای سال عملکرد {INTACODE_YEAR} —
-                شامل {faNum(INTACODE_COUNT)} کد فعالیت در بخش‌های تولید، بازرگانی و خدمات.
-                کد فعالیت، عنوان، نسبت سود فعالیت و نسبت سود ناویژه را جستجو کنید.
+                داده‌های کامل ضریب سود فعالیت (اینتاکد) برای سال‌های عملکرد ۱۴۰۲ تا ۱۴۰۴ —
+                شامل {faNum(INTACODE_COUNT)} کد فعالیت در ۳ بخش تولید، بازرگانی و خدمات.
+                با انتخابگر سال و فیلتر بخش، کد فعالیت، نسبت سود فعالیت و سود ناویژه را جستجو کنید.
               </p>
               <div className="mt-6 flex flex-wrap gap-6">
-                <Stat value={faNum(INTACODE_COUNT)} label="کد فعالیت" />
+                <Stat value={faNum(INTACODE_COUNT)} label="کد فعالیت (۳ سال)" />
                 <Stat value={faNum(INTACODE_SECTORS.length)} label="بخش فعالیت" />
-                <Stat value={INTACODE_YEAR} label="سال عملکرد" />
+                <Stat value={faNum(INTACODE_YEARS.length)} label="سال عملکرد" />
               </div>
             </div>
           </div>
@@ -146,8 +156,26 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
               </div>
             </div>
 
+            {/* Year selector */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500 ml-1">سال عملکرد:</span>
+              {INTACODE_YEARS.map((y) => (
+                <button
+                  key={y}
+                  onClick={() => onYearChange(y)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    year === y
+                      ? "bg-slate-900 text-yellow-400 border-slate-900"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                  }`}
+                >
+                  {y} ({faNum(INTACODE_YEAR_COUNTS[y] ?? 0)})
+                </button>
+              ))}
+            </div>
+
             {/* Sector filter */}
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <button
                 onClick={() => onSectorChange("")}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
@@ -156,7 +184,7 @@ export function IntacodeView({ onGoHome }: { onGoHome: () => void }) {
                     : "bg-white text-slate-600 border-slate-200 hover:border-yellow-300"
                 }`}
               >
-                همه بخش‌ها ({faNum(INTACODE_COUNT)})
+                همه بخش‌ها ({faNum(yearCount)})
               </button>
               {INTACODE_SECTORS.map((s) => (
                 <button

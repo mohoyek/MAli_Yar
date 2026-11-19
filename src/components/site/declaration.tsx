@@ -327,8 +327,8 @@ function IncomeDeclaration() {
     const sample = INTACODE_ENTRIES.find(
       (e) => e.year === "1404" && e.sector === "خدمات" && e.code === "1106031"
     ) ?? INTACODE_ENTRIES.find((e) => e.year === "1404" && e.sector === "خدمات");
-    setForm({
-      ...INCOME_INITIAL,
+    setForm((f) => ({
+      ...f, // preserve current year selection (1402/1403/1404/1405)
       name: "شرکت نمونه — بخش خدمات",
       nationalId: "۱۴۰۰۱۲۳۴۵۶۷",
       economicCode: "۴۱۱۲۲۳۳۴۴۵۵۶",
@@ -348,7 +348,7 @@ function IncomeDeclaration() {
       depreciation: "600,000,000",
       otherDeductible: "200,000,000",
       prepaidTax: "1,200,000,000",
-    });
+    }));
     setShowResult(false);
   }
 
@@ -448,6 +448,8 @@ function IncomeDeclaration() {
                   <SelectContent>
                     <SelectItem value="1405">عملکرد ۱۴۰۵</SelectItem>
                     <SelectItem value="1404">عملکرد ۱۴۰۴</SelectItem>
+                    <SelectItem value="1403">عملکرد ۱۴۰۳</SelectItem>
+                    <SelectItem value="1402">عملکرد ۱۴۰۲</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
@@ -833,8 +835,8 @@ function VATDeclaration() {
   }
 
   function loadSample() {
-    setForm({
-      ...VAT_INITIAL,
+    setForm((f) => ({
+      ...f, // preserve current year selection
       name: "شرکت نمونه — بازرگانی",
       nationalId: "۱۴۰۰۷۶۵۴۳۲۱",
       economicCode: "41122334455",
@@ -847,7 +849,7 @@ function VATDeclaration() {
       exemptPurchases: "200,000,000",
       reverseChargePurchases: "0",
       carriedForwardCredit: "45,000,000",
-    });
+    }));
     setShowResult(false);
   }
 
@@ -923,6 +925,8 @@ function VATDeclaration() {
                   <SelectContent>
                     <SelectItem value="1405">۱۴۰۵</SelectItem>
                     <SelectItem value="1404">۱۴۰۴</SelectItem>
+                    <SelectItem value="1403">۱۴۰۳</SelectItem>
+                    <SelectItem value="1402">۱۴۰۲</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>

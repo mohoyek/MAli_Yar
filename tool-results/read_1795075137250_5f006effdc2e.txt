@@ -1,0 +1,1029 @@
+     1→"use client";
+     2→
+     3→import { useMemo, useState } from "react";
+     4→import {
+     5→  Calculator,
+     6→  BadgeCheck,
+     7→  AlertCircle,
+     8→  Sparkles,
+     9→  FileSpreadsheet,
+    10→  FileText,
+    11→  BarChart3,
+    12→  CheckCircle2,
+    13→  ChevronLeft,
+    14→  HelpCircle,
+    15→  Info,
+    16→} from "lucide-react";
+    17→import { Button } from "@/components/ui/button";
+    18→import { Input } from "@/components/ui/input";
+    19→import {
+    20→  Select,
+    21→  SelectContent,
+    22→  SelectItem,
+    23→  SelectTrigger,
+    24→  SelectValue,
+    25→} from "@/components/ui/select";
+    26→import { Badge } from "@/components/ui/badge";
+    27→import {
+    28→  Accordion,
+    29→  AccordionContent,
+    30→  AccordionItem,
+    31→  AccordionTrigger,
+    32→} from "@/components/ui/accordion";
+    33→import { useToast } from "@/hooks/use-toast";
+    34→
+    35→/* ------------------------------------------------------------------ */
+    36→/*  Tax constants per عملکرد year (ریال)                               */
+    37→/*  منابع: قانون بودجه سالانه، بخشنامه‌های سازمان امور مالیاتی           */
+    38→/* ------------------------------------------------------------------ */
+    39→
+    40→type YearData = {
+    41→  exemption: number; // معافیت سالانه ماده ۱۰۱ (بدون سامانه مودیان)
+    42→  b1: number; // سقف پله ۱۵٪ ماده ۱۳۱
+    43→  b2: number; // سقف پله ۲۰٪ ماده ۱۳۱
+    44→  ceiling: number; // سقف فروش تبصره ۱۰۰
+    45→  note?: string;
+    46→};
+    47→
+    48→const TAX_YEARS: Record<string, YearData> = {
+    49→  "1405": {
+    50→    exemption: 2_800_000_000,
+    51→    b1: 4_000_000_000,
+    52→    b2: 8_000_000_000,
+    53→    ceiling: 720_000_000_000,
+    54→    note: "عملکرد ۱۴۰۵: معافیت ماده ۱۰۱ برابر ۲۸۰ میلیون تومان و پله‌های ماده ۱۳۱ تا ۴ و ۸ میلیارد ریال طبق قانون بودجه ۱۴۰۵ است.",
+    55→  },
+    56→  "1404": {
+    57→    exemption: 2_000_000_000,
+    58→    b1: 2_000_000_000,
+    59→    b2: 4_000_000_000,
+    60→    ceiling: 720_000_000_000,
+    61→    note: "عملکرد ۱۴۰۴: معافیت ماده ۱۰۱ برابر ۲۰۰ میلیون تومان است؛ سقف فروش تبصره ۱۰۰ برابر ۷۲ میلیارد تومان (۱۵۰ برابر معافیت ماده ۸۴) اعلام شده است.",
+    62→  },
+    63→  "1403": {
+    64→    exemption: 1_000_000_000,
+    65→    b1: 2_000_000_000,
+    66→    b2: 4_000_000_000,
+    67→    ceiling: 216_000_000_000,
+    68→    note: "عملکرد ۱۴۰۳: معافیت پایه ۱۰۰ میلیون تومان است و در صورت ثبت کامل تراکنش‌ها در سامانه مودیان تا ۱۴۴ میلیون تومان (۱٬۴۴۰٬۰۰۰٬۰۰۰ ریال) افزایش می‌یابد.",
+    69→  },
+    70→  "1402": {
+    71→    exemption: 475_000_000,
+    72→    b1: 2_000_000_000,
+    73→    b2: 4_000_000_000,
+    74→    ceiling: 71_250_000_000,
+    75→  },
+    76→  "1401": {
+    77→    exemption: 396_000_000,
+    78→    b1: 2_000_000_000,
+    79→    b2: 4_000_000_000,
+    80→    ceiling: 59_400_000_000,
+    81→  },
+    82→  "1400": {
+    83→    exemption: 360_000_000,
+    84→    b1: 500_000_000,
+    85→    b2: 1_000_000_000,
+    86→    ceiling: 54_000_000_000,
+    87→  },
+    88→};
+    89→
+    90→/* ضریب سود فعالیت (اینتاکد) - مقادیر تقریبی برای برآورد */
+    91→const JOBS: { name: string; coef: number }[] = [
+    92→  { name: "سوپرمارکت و فروش مواد غذایی", coef: 15 },
+    93→  { name: "نانوایی (بربری، سنگک، لواش)", coef: 15 },
+    94→  { name: "فروش میوه و سبزی", coef: 20 },
+    95→  { name: "قصابی و فروش گوشت", coef: 20 },
+    96→  { name: "فروش مرغ و تخم‌مرغ", coef: 15 },
+    97→  { name: "لبنیات‌فروشی", coef: 15 },
+    98→  { name: "فروش آبمیوه، بستنی و فالوده", coef: 18.4 },
+    99→  { name: "رستوران و فست‌فود", coef: 25 },
+   100→  { name: "کافه و چایخانه", coef: 25 },
+   101→  { name: "فروش پوشاک و منسوجات", coef: 25 },
+   102→  { name: "کفش و چرم‌فروشی", coef: 25 },
+   103→  { name: "طلا و جواهرفروشی", coef: 8 },
+   104→  { name: "فروش موبایل و لوازم جانبی", coef: 15 },
+   105→  { name: "فروش لوازم خانگی", coef: 15 },
+   106→  { name: "فروش قطعات و لوازم خودرو", coef: 20 },
+   107→  { name: "تعمیرگاه خودرو (مکانیکی)", coef: 30 },
+   108→  { name: "صافکاری و نقاشی خودرو", coef: 30 },
+   109→  { name: "آرایشگاه و زیبایی", coef: 30 },
+   110→  { name: "داروخانه", coef: 10 },
+   111→  { name: "عطاری", coef: 20 },
+   112→  { name: "آژانس خدمات مسافرتی", coef: 10 },
+   113→  { name: "دفتر فنی و مهندسی", coef: 30 },
+   114→  { name: "مطب پزشک و کلینیک درمانی", coef: 45 },
+   115→  { name: "دندانپزشکی", coef: 50 },
+   116→  { name: "آموزشگاه آزاد", coef: 25 },
+   117→  { name: "چاپ، تبلیغات و گرافیک", coef: 25 },
+   118→  { name: "خشکشویی و لباسشویی", coef: 30 },
+   119→  { name: "عکاسی و فیلم‌برداری", coef: 30 },
+   120→  { name: "فروش مصالح ساختمانی", coef: 15 },
+   121→  { name: "تأسیسات مکانیکی و برقی ساختمان", coef: 35 },
+   122→  { name: "حمل‌ونقل کالا و باربری", coef: 25 },
+   123→];
+   124→
+   125→const PARTNER_OPTIONS = [
+   126→  { value: "single", label: "یک نفر", count: 1 },
+   127→  { value: "multi", label: "دو نفر (یا بیشتر)", count: 2 },
+   128→  { value: "couple", label: "زن و شوهر", count: 1 },
+   129→];
+   130→
+   131→/* ------------------------------------------------------------------ */
+   132→/*  Helpers                                                            */
+   133→/* ------------------------------------------------------------------ */
+   134→
+   135→const faNum = (n: number) => new Intl.NumberFormat("fa-IR").format(n);
+   136→
+   137→const toFaDigits = (s: string) =>
+   138→  s.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+   139→
+   140→function parseMoney(raw: string): number {
+   141→  const digits = raw
+   142→    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+   143→    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+   144→    .replace(/[^0-9]/g, "");
+   145→  return digits ? parseInt(digits, 10) : 0;
+   146→}
+   147→
+   148→function formatMoneyInput(raw: string): string {
+   149→  const n = parseMoney(raw);
+   150→  return n ? new Intl.NumberFormat("en-US").format(n) : "";
+   151→}
+   152→
+   153→type BracketResult = { b15: number; b20: number; b25: number; total: number };
+   154→
+   155→function progressiveTax(income: number, b1: number, b2: number): BracketResult {
+   156→  const safe = Math.max(0, income);
+   157→  const p15 = Math.min(safe, b1);
+   158→  const p20 = Math.max(0, Math.min(safe, b2) - b1);
+   159→  const p25 = Math.max(0, safe - b2);
+   160→  const total = p15 * 0.15 + p20 * 0.2 + p25 * 0.25;
+   161→  return { b15: p15 * 0.15, b20: p20 * 0.2, b25: p25 * 0.25, total };
+   162→}
+   163→
+   164→type Result = {
+   165→  netProfit: number;
+   166→  coefIncome: number;
+   167→  exemptionTotal: number;
+   168→  exemptionCount: number;
+   169→  ehtar: { taxable: number; tax: BracketResult };
+   170→  tabsare: { taxable: number; tax: BracketResult };
+   171→  saving: number;
+   172→  better: "ehtar" | "tabsare" | "equal";
+   173→  underCeiling: boolean;
+   174→  coef: number;
+   175→  year: string;
+   176→};
+   177→
+   178→/* ------------------------------------------------------------------ */
+   179→/*  Component                                                          */
+   180→/* ------------------------------------------------------------------ */
+   181→
+   182→const faqItems = [
+   183→  {
+   184→    q: "این ابزار دقیقاً چه کاری می‌کند؟",
+   185→    a: "با یک بار وارد کردن فروش، هزینه و عنوان شغل، مالیات عملکرد شما را هم با روش اظهارنامه (بر پایه سود واقعی) و هم با روش تبصره ۱۰۰ (بر پایه ضریب اینتاکد) به‌صورت پله‌به‌پله محاسبه می‌کند و کنار هم نشان می‌دهد تا ببینید کدام روش برای شما ارزان‌تر تمام می‌شود.",
+   186→  },
+   187→  {
+   188→    q: "چرا باید سال فعالیت و تعداد شرکا را وارد کنم؟",
+   189→    a: "معافیت سالانه ماده ۱۰۱ و سقف پله‌های ماده ۱۳۱ هر سال با قانون بودجه تغییر می‌کند؛ پس سال عملکرد، ارقام معافیت را تعیین می‌کند. تعداد شرکا هم در تعداد معافیت اثر دارد: در مشارکت‌های مدنی حداکثر دو معافیت به کل شرکا تعلق می‌گیرد و زن و شوهر در حکم یک شریک هستند.",
+   190→  },
+   191→  {
+   192→    q: "ضریب اینتاکد شغلم را از کجا بیاورم؟",
+   193→    a: "ضریب دقیق شغل خود را از جدول اینتاکد (ضریب سود فعالیت) سازمان امور مالیاتی استعلام کنید. ضرایب فهرست این ابزار تقریبی و برای برآورد اولیه است؛ برای دقت کامل، گزینه «سایر (ورود دستی ضریب)» را انتخاب کنید و ضریب دقیق را وارد کنید.",
+   194→  },
+   195→  {
+   196→    q: "اگر روش تبصره ۱۰۰ ارزان‌تر بود، حتماً باید همان را انتخاب کنم؟",
+   197→    a: "خیر. استفاده از تبصره ۱۰۰ شرط دارد: فروش سالانه زیر سقف اعلامی سازمان امور مالیاتی، نبود تراکنش نامتناسب و رعایت شرایط اعلامی هر سال. این ابزار فقط هزینه دو روش را مقایسه می‌کند و شرایط پذیرش شما را تأیید نمی‌کند.",
+   198→  },
+   199→  {
+   200→    q: "چرا گاهی مالیات یکی از دو روش صفر می‌شود؟",
+   201→    a: "اگر درآمد مشمول یک روش (بعد از کسر معافیت ماده ۱۰۱) صفر یا منفی شود، مالیات آن روش صفر خواهد بود؛ مثلاً وقتی هزینه‌های مستند تمام سود را می‌بلعند یا فروش ضربدر ضریب، کمتر از معافیت سالانه است.",
+   202→  },
+   203→  {
+   204→    q: "نتیجه این ابزار قطعی است؟",
+   205→    a: "خیر؛ نتیجه یک برآورد آموزشی است. عدد نهایی به هزینه‌های قابل قبول تأییدشده، ضریب رسمی اینتاکد، وضعیت سامانه مودیان و نظر کارشناس پرونده بستگی دارد. برای پرونده‌های مهم حتماً با مشاور مالیاتی مشورت کنید.",
+   206→  },
+   207→];
+   208→
+   209→export function CompareCalculator({ onGoHub }: { onGoHub: () => void }) {
+   210→  const { toast } = useToast();
+   211→
+   212→  const [sales, setSales] = useState("");
+   213→  const [expense, setExpense] = useState("");
+   214→  const [year, setYear] = useState("1405");
+   215→  const [partners, setPartners] = useState("single");
+   216→  const [job, setJob] = useState("");
+   217→  const [customCoef, setCustomCoef] = useState("");
+   218→  const [result, setResult] = useState<Result | null>(null);
+   219→  const [resultTab, setResultTab] = useState<"sheet" | "excel" | "analysis">("sheet");
+   220→
+   221→  const yearData = TAX_YEARS[year];
+   222→  const partnerCount =
+   223→    PARTNER_OPTIONS.find((p) => p.value === partners)?.count ?? 1;
+   224→  const selectedJob = JOBS.find((j) => j.name === job);
+   225→  const coef =
+   226→    job === "__custom"
+   227→      ? parseMoney(customCoef) / 100 || 0
+   228→      : selectedJob?.coef ?? 0;
+   229→
+   230→  const rows = useMemo(() => {
+   231→    if (!result) return null;
+   232→    return [
+   233→      { label: "سود خالص (فروش منهای هزینه)", value: result.netProfit, bold: false },
+   234→      { label: "درآمد مشمول با ضریب اینتاکد", value: result.coefIncome, bold: false },
+   235→      {
+   236→        label: `معافیت سالانه ماده ۱۰۱ (${faNum(result.exemptionCount)} × ${faNum(result.exemptionTotal / result.exemptionCount)})`,
+   237→        value: result.exemptionTotal,
+   238→        bold: false,
+   239→      },
+   240→      {
+   241→        label: "درآمد مشمول بعد از معافیت (اظهارنامه)",
+   242→        value: result.ehtar.taxable,
+   243→        bold: false,
+   244→      },
+   245→      { label: "پله ۱۵٪ (اظهارنامه)", value: result.ehtar.tax.b15, bold: false },
+   246→      { label: "پله ۲۰٪ (اظهارنامه)", value: result.ehtar.tax.b20, bold: false },
+   247→      { label: "پله ۲۵٪ (اظهارنامه)", value: result.ehtar.tax.b25, bold: false },
+   248→      { label: "جمع مالیات روش اظهارنامه", value: result.ehtar.tax.total, bold: true },
+   249→      {
+   250→        label: "درآمد مشمول بعد از معافیت (تبصره ۱۰۰)",
+   251→        value: result.tabsare.taxable,
+   252→        bold: false,
+   253→      },
+   254→      { label: "پله ۱۵٪ (تبصره ۱۰۰)", value: result.tabsare.tax.b15, bold: false },
+   255→      { label: "پله ۲۰٪ (تبصره ۱۰۰)", value: result.tabsare.tax.b20, bold: false },
+   256→      { label: "پله ۲۵٪ (تبصره ۱۰۰)", value: result.tabsare.tax.b25, bold: false },
+   257→      { label: "جمع مالیات روش تبصره ۱۰۰", value: result.tabsare.tax.total, bold: true },
+   258→    ];
+   259→  }, [result]);
+   260→
+   261→  function calculate() {
+   262→    const salesNum = parseMoney(sales);
+   263→    const expenseNum = parseMoney(expense);
+   264→
+   265→    if (!salesNum) {
+   266→      toast({
+   267→        title: "ورود فروش الزامی است",
+   268→        description: "لطفاً مبلغ فروش دوره را به ریال وارد کنید.",
+   269→      });
+   270→      return;
+   271→    }
+   272→    if (!job) {
+   273→      toast({
+   274→        title: "انتخاب عنوان شغلی الزامی است",
+   275→        description: "شغل خود را از فهرست انتخاب کنید یا ضریب را دستی وارد کنید.",
+   276→      });
+   277→      return;
+   278→    }
+   279→    if (job === "__custom" && !coef) {
+   280→      toast({
+   281→        title: "ضریب نامعتبر است",
+   282→        description: "ضریب سود فعالیت را بین ۰ تا ۱۰۰ درصد وارد کنید.",
+   283→      });
+   284→      return;
+   285→    }
+   286→
+   287→    const net = Math.max(0, salesNum - expenseNum);
+   288→    const coefIncome = salesNum * (coef / 100);
+   289→    const exemptionTotal = yearData.exemption * partnerCount;
+   290→
+   291→    const ehtarTaxable = Math.max(0, net - exemptionTotal);
+   292→    const tabsareTaxable = Math.max(0, coefIncome - exemptionTotal);
+   293→
+   294→    const ehtar = {
+   295→      taxable: ehtarTaxable,
+   296→      tax: progressiveTax(ehtarTaxable, yearData.b1, yearData.b2),
+   297→    };
+   298→    const tabsare = {
+   299→      taxable: tabsareTaxable,
+   300→      tax: progressiveTax(tabsareTaxable, yearData.b1, yearData.b2),
+   301→    };
+   302→
+   303→    const diff = ehtar.tax.total - tabsare.tax.total;
+   304→    setResult({
+   305→      netProfit: net,
+   306→      coefIncome,
+   307→      exemptionTotal,
+   308→      exemptionCount: partnerCount,
+   309→      ehtar,
+   310→      tabsare,
+   311→      saving: Math.abs(diff),
+   312→      better: diff > 1 ? "tabsare" : diff < -1 ? "ehtar" : "equal",
+   313→      underCeiling: salesNum <= yearData.ceiling,
+   314→      coef,
+   315→      year,
+   316→    });
+   317→    setResultTab("sheet");
+   318→    toast({
+   319→      title: "محاسبه انجام شد",
+   320→      description: "برگه نتیجه در پایین صفحه فعال شد.",
+   321→    });
+   322→  }
+   323→
+   324→  function exportExcel() {
+   325→    if (!result || !rows) return;
+   326→    const header = ["ردیف", "شرح", "مبلغ (ریال)"];
+   327→    const lines: (string | number)[][] = rows.map((r, i) => [
+   328→      i + 1,
+   329→      r.label,
+   330→      r.value,
+   331→    ]);
+   332→    lines.push(["", "صرفه‌جویی با انتخاب روش بهتر", result.saving]);
+   333→    lines.push([
+   334→      "",
+   335→      "روش پیشنهادی",
+   336→      result.better === "ehtar"
+   337→        ? "اظهارنامه"
+   338→        : result.better === "tabsare"
+   339→          ? "تبصره ۱۰۰"
+   340→          : "برابر",
+   341→    ]);
+   342→    lines.push([
+   343→      "",
+   344→      "وضعیت سقف فروش تبصره ۱۰۰",
+   345→      result.underCeiling ? "زیر سقف (مشمول)" : "بالای سقف (مشمول نیست)",
+   346→    ]);
+   347→    const csv =
+   348→      "\uFEFF" +
+   349→      [header, ...lines]
+   350→        .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+   351→        .join("\r\n");
+   352→    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+   353→    const url = URL.createObjectURL(blob);
+   354→    const a = document.createElement("a");
+   355→    a.href = url;
+   356→    a.download = `compare-tax-methods-${result.year}.csv`;
+   357→    a.click();
+   358→    URL.revokeObjectURL(url);
+   359→  }
+   360→
+   361→  return (
+   362→    <div className="min-h-screen">
+   363→      {/* Hero */}
+   364→      <section className="py-8">
+   365→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   366→          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-10 relative overflow-hidden">
+   367→            <div className="absolute -top-20 -left-20 w-64 h-64 bg-yellow-100/50 rounded-full blur-3xl pointer-events-none" />
+   368→            <div className="relative">
+   369→              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 px-3 py-1 rounded-full text-xs font-medium">
+   370→                <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-500 ml-1" />
+   371→                در چند ثانیه بفهم کدام روش مالیاتی برایت ارزان‌تر است
+   372→              </Badge>
+   373→              <h1 className="mt-4 text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight">
+   374→                مقایسه مالیات اظهارنامه و{" "}
+   375→                <mark className="bg-yellow-300 text-slate-900 px-2 rounded-md">
+   376→                  تبصره ۱۰۰
+   377→                </mark>
+   378→              </h1>
+   379→              <p className="mt-4 text-slate-600 text-sm md:text-base max-w-2xl leading-7">
+   380→                فروش، هزینه و عنوان شغل را وارد کنید تا مالیات روش اظهارنامه و
+   381→                روش تبصره ۱۰۰ کنار هم و پله‌به‌پله محاسبه شود و ببینید کدام روش
+   382→                برای شما کم‌هزینه‌تر است.
+   383→              </p>
+   384→              <Button
+   385→                onClick={() =>
+   386→                  document
+   387→                    .getElementById("calculator-form")
+   388→                    ?.scrollIntoView({ behavior: "smooth" })
+   389→                }
+   390→                className="mt-6 bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-full px-5"
+   391→              >
+   392→                شروع محاسبه
+   393→                <ChevronLeft className="h-4 w-4 mr-1" />
+   394→              </Button>
+   395→            </div>
+   396→          </div>
+   397→        </div>
+   398→      </section>
+   399→
+   400→      {/* Related tools tab strip */}
+   401→      <section className="py-2">
+   402→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   403→          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none whitespace-nowrap">
+   404→            {[
+   405→              "مالیات مشاغل",
+   406→              "مالیات مقطوع تبصره ۱۰۰",
+   407→              "مقایسه اظهارنامه و تبصره ۱۰۰",
+   408→              "مالیات شرکت‌ها",
+   409→              "مالیات حساب بانکی",
+   410→              "مالیات چک",
+   411→              "حق تمبر (ماده ۱۰۳)",
+   412→              "مهلت‌های دادرسی",
+   413→            ].map((t) => {
+   414→              const active = t === "مقایسه اظهارنامه و تبصره ۱۰۰";
+   415→              return (
+   416→                <button
+   417→                  key={t}
+   418→                  onClick={
+   419→                    active
+   420→                      ? undefined
+   421→                      : () => {
+   422→                          onGoHub();
+   423→                          toast({
+   424→                            title: "به فهرست ابزارها منتقل شدید",
+   425→                            description:
+   426→                              "این ابزار در صفحه «همه محاسبه‌گرها» فهرست شده است.",
+   427→                          });
+   428→                        }
+   429→                  }
+   430→                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all border ${
+   431→                    active
+   432→                      ? "bg-yellow-400 text-slate-900 border-yellow-400 shadow-sm"
+   433→                      : "bg-white text-slate-600 border-slate-200 hover:border-yellow-300 hover:text-slate-900"
+   434→                  }`}
+   435→                >
+   436→                  {t}
+   437→                </button>
+   438→              );
+   439→            })}
+   440→          </div>
+   441→        </div>
+   442→      </section>
+   443→
+   444→      {/* Calculator */}
+   445→      <section id="calculator-form" className="py-6">
+   446→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   447→          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+   448→            <h2 className="text-xl font-extrabold text-slate-900">
+   449→              مقایسه مالیات اظهارنامه و تبصره ۱۰۰
+   450→            </h2>
+   451→            <p className="mt-1 text-sm text-slate-500">
+   452→              اطلاعات پایه پرونده عملکرد خود را وارد کنید.
+   453→            </p>
+   454→
+   455→            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   456→              <Field label="فروش دوره (ریال)" required>
+   457→                <Input
+   458→                  dir="ltr"
+   459→                  inputMode="numeric"
+   460→                  placeholder="0"
+   461→                  value={sales}
+   462→                  onChange={(e) => setSales(formatMoneyInput(e.target.value))}
+   463→                  className="text-left h-11"
+   464→                />
+   465→              </Field>
+   466→
+   467→              <Field label="هزینه و استهلاک (ریال)" required>
+   468→                <Input
+   469→                  dir="ltr"
+   470→                  inputMode="numeric"
+   471→                  placeholder="0"
+   472→                  value={expense}
+   473→                  onChange={(e) => setExpense(formatMoneyInput(e.target.value))}
+   474→                  className="text-left h-11"
+   475→                />
+   476→              </Field>
+   477→
+   478→              <Field label="سال فعالیت" required>
+   479→                <Select value={year} onValueChange={setYear}>
+   480→                  <SelectTrigger className="h-11">
+   481→                    <SelectValue />
+   482→                  </SelectTrigger>
+   483→                  <SelectContent>
+   484→                    {Object.keys(TAX_YEARS).map((y) => (
+   485→                      <SelectItem key={y} value={y}>
+   486→                        سال {toFaDigits(y)}
+   487→                      </SelectItem>
+   488→                    ))}
+   489→                  </SelectContent>
+   490→                </Select>
+   491→              </Field>
+   492→
+   493→              <Field label="تعداد شرکاء" required>
+   494→                <Select value={partners} onValueChange={setPartners}>
+   495→                  <SelectTrigger className="h-11">
+   496→                    <SelectValue />
+   497→                  </SelectTrigger>
+   498→                  <SelectContent>
+   499→                    {PARTNER_OPTIONS.map((p) => (
+   500→                      <SelectItem key={p.value} value={p.value}>
+   501→                        {p.label}
+   502→                      </SelectItem>
+   503→                    ))}
+   504→                  </SelectContent>
+   505→                </Select>
+   506→              </Field>
+   507→
+   508→              <Field label="عنوان شغلی" required hint="ضریب اینتاکد تقریبی">
+   509→                <Select value={job} onValueChange={setJob}>
+   510→                  <SelectTrigger className="h-11">
+   511→                    <SelectValue placeholder="انتخاب کنید" />
+   512→                  </SelectTrigger>
+   513→                  <SelectContent className="max-h-72">
+   514→                    {JOBS.map((j) => (
+   515→                      <SelectItem key={j.name} value={j.name}>
+   516→                        {j.name} (≈ {faNum(j.coef)}٪)
+   517→                      </SelectItem>
+   518→                    ))}
+   519→                    <SelectItem value="__custom">سایر (ورود دستی ضریب)</SelectItem>
+   520→                  </SelectContent>
+   521→                </Select>
+   522→              </Field>
+   523→
+   524→              {job === "__custom" && (
+   525→                <Field label="ضریب سود فعالیت (درصد)" required>
+   526→                  <Input
+   527→                    dir="ltr"
+   528→                    inputMode="decimal"
+   529→                    placeholder="0 - 100"
+   530→                    value={customCoef}
+   531→                    onChange={(e) => {
+   532→                      const v = e.target.value.replace(/[^0-9.]/g, "");
+   533→                      setCustomCoef(v);
+   534→                    }}
+   535→                    className="text-left h-11"
+   536→                  />
+   537→                </Field>
+   538→              )}
+   539→            </div>
+   540→
+   541→            <div className="mt-6 flex flex-wrap items-center gap-3">
+   542→              <Button
+   543→                onClick={calculate}
+   544→                className="bg-yellow-400 text-slate-900 hover:bg-yellow-500 rounded-full px-6 h-11 font-bold"
+   545→              >
+   546→                <Calculator className="h-4 w-4 ml-1" />
+   547→                محاسبه نتیجه
+   548→              </Button>
+   549→              <p className="text-xs text-slate-500 flex items-center gap-1">
+   550→                <Info className="h-3.5 w-3.5" />
+   551→                فایل‌ها و لینک نتیجه بعد از محاسبه فعال می‌شوند
+   552→              </p>
+   553→            </div>
+   554→
+   555→            {yearData.note && (
+   556→              <div className="mt-5 flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 leading-6">
+   557→                <AlertCircle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
+   558→                {yearData.note}
+   559→              </div>
+   560→            )}
+   561→          </div>
+   562→        </div>
+   563→      </section>
+   564→
+   565→      {/* Result sheet */}
+   566→      <section className="pb-6">
+   567→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   568→          <div
+   569→            className={`bg-white rounded-2xl border shadow-sm p-6 md:p-8 transition-opacity ${
+   570→              result
+   571→                ? "border-slate-200"
+   572→                : "border-slate-200/60 opacity-60 pointer-events-none select-none"
+   573→            }`}
+   574→            aria-hidden={!result}
+   575→          >
+   576→            <div className="flex items-center justify-between flex-wrap gap-3">
+   577→              <h2 className="text-xl font-extrabold text-slate-900">
+   578→                برگه نتیجه محاسبه
+   579→              </h2>
+   580→              <div className="flex items-center gap-2">
+   581→                <ResultTabButton
+   582→                  active={resultTab === "sheet"}
+   583→                  onClick={() => setResultTab("sheet")}
+   584→                  icon={<FileText className="h-4 w-4" />}
+   585→                  label="برگه نتیجه"
+   586→                />
+   587→                <ResultTabButton
+   588→                  active={resultTab === "excel"}
+   589→                  onClick={() => {
+   590→                    setResultTab("excel");
+   591→                    exportExcel();
+   592→                  }}
+   593→                  icon={<FileSpreadsheet className="h-4 w-4" />}
+   594→                  label="خروجی اکسل"
+   595→                />
+   596→                <ResultTabButton
+   597→                  active={resultTab === "analysis"}
+   598→                  onClick={() => setResultTab("analysis")}
+   599→                  icon={<BarChart3 className="h-4 w-4" />}
+   600→                  label="تحلیل"
+   601→                />
+   602→              </div>
+   603→            </div>
+   604→
+   605→            {!result && (
+   606→              <p className="mt-6 text-sm text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded-xl p-6 text-center">
+   607→                برای مشاهده نتیجه، ابتدا فرم بالا را تکمیل و روی «محاسبه نتیجه»
+   608→                بزنید.
+   609→              </p>
+   610→            )}
+   611→
+   612→            {result && resultTab === "sheet" && rows && (
+   613→              <div className="mt-6">
+   614→                <div className="rounded-xl border border-slate-200 overflow-hidden">
+   615→                  {rows.map((r, i) => (
+   616→                    <div
+   617→                      key={i}
+   618→                      className={`flex items-center justify-between gap-4 px-4 py-3 ${
+   619→                        i % 2 === 0 ? "bg-white" : "bg-slate-50/60"
+   620→                      } ${r.bold ? "border-y border-yellow-200 bg-yellow-50/70" : ""}`}
+   621→                    >
+   622→                      <span
+   623→                        className={`text-sm leading-6 ${
+   624→                          r.bold
+   625→                            ? "font-extrabold text-slate-900"
+   626→                            : "text-slate-700"
+   627→                        }`}
+   628→                      >
+   629→                        {r.label}
+   630→                      </span>
+   631→                      <span
+   632→                        className={`text-sm font-bold shrink-0 tabular-nums ${
+   633→                          r.bold ? "text-slate-900" : "text-slate-700"
+   634→                        }`}
+   635→                      >
+   636→                        {faNum(r.value)} ریال
+   637→                      </span>
+   638→                    </div>
+   639→                  ))}
+   640→
+   641→                  {/* Saving + verdict */}
+   642→                  <div className="px-4 py-3 bg-slate-50/60 flex items-center justify-between gap-4">
+   643→                    <span className="text-sm text-slate-700">
+   644→                      صرفه‌جویی با انتخاب روش بهتر
+   645→                    </span>
+   646→                    <span className="text-sm font-bold tabular-nums text-emerald-700">
+   647→                      {faNum(result.saving)} ریال
+   648→                    </span>
+   649→                  </div>
+   650→                  <div className="px-4 py-3 flex items-center justify-between gap-4 border-y border-yellow-200 bg-yellow-50/70">
+   651→                    <span className="text-sm font-extrabold text-slate-900">
+   652→                      روش پیشنهادی (کم‌هزینه‌تر)
+   653→                    </span>
+   654→                    <Badge className="bg-yellow-400 text-slate-900 hover:bg-yellow-400 rounded-full px-3">
+   655→                      {result.better === "ehtar"
+   656→                        ? "اظهارنامه"
+   657→                        : result.better === "tabsare"
+   658→                          ? "تبصره ۱۰۰"
+   659→                          : "هر دو برابر"}
+   660→                    </Badge>
+   661→                  </div>
+   662→                  <div className="px-4 py-3 bg-slate-50/60 flex items-center justify-between gap-4">
+   663→                    <span className="text-sm text-slate-700">
+   664→                      وضعیت سقف فروش تبصره ۱۰۰
+   665→                    </span>
+   666→                    <span
+   667→                      className={`text-sm font-bold ${
+   668→                        result.underCeiling
+   669→                          ? "text-emerald-700"
+   670→                          : "text-red-600"
+   671→                      }`}
+   672→                    >
+   673→                      {result.underCeiling
+   674→                        ? "زیر سقف (مشمول)"
+   675→                        : "بالای سقف (مشمول نیست)"}
+   676→                    </span>
+   677→                  </div>
+   678→                </div>
+   679→
+   680→                <p className="mt-4 text-xs text-slate-500 leading-6 flex items-start gap-1.5">
+   681→                  <Info className="h-4 w-4 shrink-0 mt-0.5" />
+   682→                  محاسبات بر مبنای معافیت ماده ۱۰۱ و نرخ‌های پلکانی ماده ۱۳۱
+   683→                  سال {toFaDigits(result.year)} انجام شده
+   684→                  است؛ ضریب اینتاکد اعمال‌شده:{" "}
+   685→                  <bdi dir="ltr">{result.coef.toLocaleString("en-US")}</bdi>٪.
+   686→                </p>
+   687→              </div>
+   688→            )}
+   689→
+   690→            {result && resultTab === "analysis" && (
+   691→              <AnalysisPanel result={result} />
+   692→            )}
+   693→
+   694→            {result && resultTab === "excel" && (
+   695→              <p className="mt-6 text-sm text-slate-600">
+   696→                فایل اکسل برگه نتیجه دانلود شد. برای دانلود مجدد، دوباره روی
+   697→                «خروجی اکسل» بزنید.
+   698→              </p>
+   699→            )}
+   700→          </div>
+   701→        </div>
+   702→      </section>
+   703→
+   704→      {/* FAQ */}
+   705→      <section className="py-10">
+   706→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   707→          <div className="text-center mb-8">
+   708→            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 px-3 py-1 rounded-full text-xs">
+   709→              <HelpCircle className="h-3.5 w-3.5 ml-1" />
+   710→              سوالات متداول
+   711→            </Badge>
+   712→            <h2 className="mt-3 text-2xl md:text-3xl font-extrabold text-slate-900">
+   713→              پاسخ پرسش‌های رایج درباره این محاسبه
+   714→            </h2>
+   715→          </div>
+   716→          <div className="grid md:grid-cols-2 gap-4 max-w-5xl mx-auto">
+   717→            {faqItems.map((faq, i) => (
+   718→              <Accordion
+   719→                key={i}
+   720→                type="single"
+   721→                collapsible
+   722→                className="bg-white rounded-xl border border-slate-200 px-4"
+   723→              >
+   724→                <AccordionItem value={`q-${i}`} className="border-0">
+   725→                  <AccordionTrigger className="text-right hover:no-underline py-5">
+   726→                    <div className="flex items-center gap-3 text-right">
+   727→                      <span className="grid place-items-center h-8 w-8 rounded-lg bg-yellow-400 text-slate-900 text-xs font-extrabold shrink-0">
+   728→                        {(i + 1).toLocaleString("fa-IR", {
+   729→                          minimumIntegerDigits: 2,
+   730→                        })}
+   731→                      </span>
+   732→                      <span className="font-bold text-slate-900 text-sm leading-6">
+   733→                        {faq.q}
+   734→                      </span>
+   735→                    </div>
+   736→                  </AccordionTrigger>
+   737→                  <AccordionContent className="text-slate-600 text-sm leading-7 pb-5">
+   738→                    {faq.a}
+   739→                  </AccordionContent>
+   740→                </AccordionItem>
+   741→              </Accordion>
+   742→            ))}
+   743→          </div>
+   744→        </div>
+   745→      </section>
+   746→
+   747→      {/* Explanations */}
+   748→      <section className="py-6">
+   749→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   750→          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-10">
+   751→            <Badge className="bg-slate-100 text-slate-700 border-slate-200 px-3 py-1 rounded-full text-xs">
+   752→              <Sparkles className="h-3.5 w-3.5 ml-1" />
+   753→              توضیحات تکمیلی
+   754→            </Badge>
+   755→            <h2 className="mt-3 text-2xl font-extrabold text-slate-900">
+   756→              راهنمای کامل این محاسبه
+   757→            </h2>
+   758→            <h3 className="mt-6 text-lg font-bold text-slate-900">
+   759→              مقایسه مالیات اظهارنامه و تبصره ۱۰۰؛ کدام روش برای شما ارزان‌تر
+   760→              است؟
+   761→            </h3>
+   762→            <p className="mt-3 text-slate-600 text-sm leading-8">
+   763→              خیلی از صاحبان کسب‌وکار کوچک نمی‌دانند باید مالیات‌شان را با{" "}
+   764→              <b>اظهارنامه عملکرد</b> بدهند یا از <b>تبصره ماده ۱۰۰</b> استفاده
+   765→              کنند. این دو روش از دو مسیر متفاوت به مالیات می‌رسند و گاهی
+   766→              اختلاف‌شان چند برابر است. این ابزار هر دو را با یک بار ورود
+   767→              اطلاعات حساب می‌کند و کنار هم می‌گذارد.
+   768→            </p>
+   769→
+   770→            <h3 className="mt-6 text-lg font-bold text-slate-900">
+   771→              تفاوت دو روش در یک نگاه
+   772→            </h3>
+   773→            <div className="mt-3 grid md:grid-cols-2 gap-4">
+   774→              <div className="rounded-xl border border-slate-200 p-5 bg-slate-50/60">
+   775→                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+   776→                  <FileText className="h-4 w-4 text-yellow-600" />
+   777→                  روش اظهارنامه
+   778→                </h4>
+   779→                <p className="mt-2 text-sm text-slate-600 leading-7">
+   780→                  مالیات را روی سود واقعی می‌بندد؛ یعنی فروش منهای هزینه‌های
+   781→                  قابل قبول. اگر هزینه‌های مستند زیادی دارید، معمولاً این روش
+   782→                  به نفع شماست.
+   783→                </p>
+   784→              </div>
+   785→              <div className="rounded-xl border border-slate-200 p-5 bg-slate-50/60">
+   786→                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+   787→                  <Calculator className="h-4 w-4 text-yellow-600" />
+   788→                  روش تبصره ۱۰۰
+   789→                </h4>
+   790→                <p className="mt-2 text-sm text-slate-600 leading-7">
+   791→                  کاری به هزینه ندارد؛ فروش را در ضریب سود فعالیت (اینتاکد)
+   792→                  شغل شما ضرب می‌کند و سود را برآورد می‌کند. اگر ضریب شغل‌تان
+   793→                  پایین باشد یا هزینه مستند کمی داشته باشید، این روش معمولاً
+   794→                  ارزان‌تر درمی‌آید.
+   795→                </p>
+   796→              </div>
+   797→            </div>
+   798→
+   799→            <h3 className="mt-6 text-lg font-bold text-slate-900">
+   800→              در هر دو روش، سه مرحله مشترک است
+   801→            </h3>
+   802→            <ol className="mt-3 list-decimal list-inside space-y-2 text-sm text-slate-600 leading-7 pr-1">
+   803→              <li>
+   804→                رسیدن به درآمد مشمول (در اظهارنامه: فروش منهای هزینه؛ در
+   805→                تبصره ۱۰۰: فروش ضربدر ضریب اینتاکد).
+   806→              </li>
+   807→              <li>کسر معافیت سالانه ماده ۱۰۱.</li>
+   808→              <li>
+   809→                اعمال نرخ پلکانی ۱۵، ۲۰ و ۲۵ درصدی ماده ۱۳۱. خروجی این ابزار
+   810→                هر سه مرحله را برای هر دو روش جدا نشان می‌دهد تا ببینید عدد از
+   811→                کجا آمده.
+   812→              </li>
+   813→            </ol>
+   814→
+   815→            <h3 className="mt-6 text-lg font-bold text-slate-900">
+   816→              چند نکته مهم
+   817→            </h3>
+   818→            <div className="mt-3 space-y-3">
+   819→              <div className="flex items-start gap-2 text-sm text-slate-600 leading-7">
+   820→                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-1" />
+   821→                <p>
+   822→                  <b className="text-slate-900">سال را درست انتخاب کنید؛</b>{" "}
+   823→                  معافیت ماده ۱۰۱ و سقف پله‌های ماده ۱۳۱ هر سال با قانون بودجه
+   824→                  عوض می‌شود.
+   825→                </p>
+   826→              </div>
+   827→              <div className="flex items-start gap-2 text-sm text-slate-600 leading-7">
+   828→                <AlertCircle className="h-4 w-4 text-yellow-600 shrink-0 mt-1" />
+   829→                <p>
+   830→                  <b className="text-slate-900">
+   831→                    ارزان‌تر بودن، به معنی مجاز بودن نیست؛
+   832→                  </b>{" "}
+   833→                  استفاده از تبصره ۱۰۰ شرط دارد، مثل فروش زیر سقف اعلامی و نبود
+   834→                  تراکنش نامتناسب. این ابزار فقط مالیات دو روش را مقایسه می‌کند
+   835→                  و شرایط پذیرش را بررسی نمی‌کند.
+   836→                </p>
+   837→              </div>
+   838→            </div>
+   839→
+   840→            <p className="mt-5 text-xs text-slate-500 leading-7 bg-slate-50 border border-slate-200 rounded-xl p-4">
+   841→              مبنای قانونی: مواد ۹۵ تا ۱۰۱، تبصره ماده ۱۰۰ و ماده ۱۳۱ قانون
+   842→              مالیات‌های مستقیم و احکام مالیاتی قانون بودجه سالانه. ضرایب فهرست
+   843→              مشاغل تقریبی است؛ ضریب رسمی را از جدول اینتاکد سازمان امور
+   844→              مالیاتی استعلام کنید. این ابزار جایگزین مشاوره تخصصی نیست.
+   845→            </p>
+   846→          </div>
+   847→        </div>
+   848→      </section>
+   849→
+   850→      {/* Comments */}
+   851→      <section className="py-6 pb-12">
+   852→        <div className="max-w-7xl mx-auto px-4 lg:px-8">
+   853→          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+   854→            <div className="flex items-center justify-between flex-wrap gap-3">
+   855→              <h2 className="text-lg font-extrabold text-slate-900">نظرات</h2>
+   856→              <Badge className="bg-slate-100 text-slate-700 border-slate-200 rounded-full px-3">
+   857→                ۰ دیدگاه
+   858→              </Badge>
+   859→            </div>
+   860→            <div className="mt-4 text-sm text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center">
+   861→              هنوز دیدگاهی ثبت نشده است. اولین نفر باشید!
+   862→            </div>
+   863→            <div className="mt-4 flex justify-center">
+   864→              <Button
+   865→                onClick={() =>
+   866→                  toast({
+   867→                    title: "ثبت دیدگاه",
+   868→                    description:
+   869→                      "برای ثبت دیدگاه ابتدا وارد حساب کاربری خود شوید.",
+   870→                  })
+   871→                }
+   872→                variant="outline"
+   873→                className="rounded-full border-slate-300 text-slate-700 hover:bg-yellow-50 hover:border-yellow-400"
+   874→              >
+   875→                <BadgeCheck className="h-4 w-4 ml-1" />
+   876→                ثبت دیدگاه
+   877→              </Button>
+   878→            </div>
+   879→          </div>
+   880→        </div>
+   881→      </section>
+   882→    </div>
+   883→  );
+   884→}
+   885→
+   886→/* ------------------------------------------------------------------ */
+   887→/*  Small pieces                                                       */
+   888→/* ------------------------------------------------------------------ */
+   889→
+   890→function Field({
+   891→  label,
+   892→  required,
+   893→  hint,
+   894→  children,
+   895→}: {
+   896→  label: string;
+   897→  required?: boolean;
+   898→  hint?: string;
+   899→  children: React.ReactNode;
+   900→}) {
+   901→  return (
+   902→    <div className="flex flex-col gap-1.5">
+   903→      <label className="text-sm font-medium text-slate-700">
+   904→        {label}
+   905→        {required && <span className="text-red-500"> *</span>}
+   906→        {hint && (
+   907→          <span className="text-[11px] font-normal text-slate-400 mr-1">
+   908→            ({hint})
+   909→          </span>
+   910→        )}
+   911→      </label>
+   912→      {children}
+   913→    </div>
+   914→  );
+   915→}
+   916→
+   917→function ResultTabButton({
+   918→  active,
+   919→  onClick,
+   920→  icon,
+   921→  label,
+   922→}: {
+   923→  active: boolean;
+   924→  onClick: () => void;
+   925→  icon: React.ReactNode;
+   926→  label: string;
+   927→}) {
+   928→  return (
+   929→    <button
+   930→      onClick={onClick}
+   931→      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition-colors border ${
+   932→        active
+   933→          ? "bg-slate-900 text-white border-slate-900"
+   934→          : "bg-white text-slate-600 border-slate-200 hover:border-yellow-400 hover:text-slate-900"
+   935→      }`}
+   936→    >
+   937→      {icon}
+   938→      {label}
+   939→    </button>
+   940→  );
+   941→}
+   942→
+   943→function AnalysisPanel({ result }: { result: Result }) {
+   944→  const cheaper =
+   945→    result.better === "ehtar"
+   946→      ? "اظهارنامه"
+   947→      : result.better === "tabsare"
+   948→        ? "تبصره ۱۰۰"
+   949→        : "هر دو روش";
+   950→  const reason =
+   951→    result.better === "ehtar"
+   952→      ? "سود واقعی اظهارشده شما (فروش منهای هزینه) نسبت به برآورد ضریبی پایین‌تر درمی‌آید؛ یعنی هزینه‌های مستند قابل قبول زیادی دارید. در این حالت روش اظهارنامه مالیات کمتری می‌دهد، اما نگهداری دفاتر و مدارک و پذیرش ریسک رسیدگی را در بر دارد."
+   953→      : result.better === "tabsare"
+   954→        ? "ضریب سود فعالیت شغل شما نسبت به سهم هزینه‌هایتان پایین است یا هزینه مستند کافی ندارید. روش تبصره ۱۰۰ مالیات کمتری می‌دهد؛ فقط یادتان باشد استفاده از آن شرط دارد: فروش زیر سقف اعلامی، نبود تراکنش نامتناسب و رعایت دستورالعمل سالانه سازمان امور مالیاتی."
+   955→        : "مالیات دو روش عملاً برابر است؛ انتخاب روش را می‌توانید بر اساس سادگی تکالیف و شرایط پذیرش هر روش انجام دهید.";
+   956→
+   957→  const coefShare =
+   958→    result.netProfit > 0
+   959→      ? Math.round((result.coefIncome / result.netProfit) * 100)
+   960→      : 0;
+   961→
+   962→  return (
+   963→    <div className="mt-6 space-y-4">
+   964→      <div className="rounded-xl border border-yellow-200 bg-yellow-50/70 p-5">
+   965→        <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
+   966→          <BadgeCheck className="h-5 w-5 text-emerald-600" />
+   967→          جمع‌بندی: روش پیشنهادی شما «{cheaper}» است
+   968→        </h3>
+   969→        <p className="mt-2 text-sm text-slate-700 leading-7">{reason}</p>
+   970→        <p className="mt-2 text-sm font-bold text-emerald-700">
+   971→          صرفه‌جویی تقریبی: {faNum(result.saving)} ریال
+   972→        </p>
+   973→      </div>
+   974→
+   975→      <div className="grid md:grid-cols-3 gap-4">
+   976→        <MiniStat
+   977→          title="سود خالص اظهارنامه"
+   978→          value={`${faNum(result.netProfit)} ریال`}
+   979→        />
+   980→        <MiniStat
+   981→          title="برآورد سود ضریبی (اینتاکد)"
+   982→          value={`${faNum(result.coefIncome)} ریال`}
+   983→        />
+   984→        <MiniStat
+   985→          title="نسبت برآورد ضریبی به سود واقعی"
+   986→          value={
+   987→            result.netProfit > 0
+   988→              ? `${faNum(coefShare)}٪`
+   989→              : "—"
+   990→          }
+   991→        />
+   992→      </div>
+   993→
+   994→      <div className="rounded-xl border border-slate-200 p-5">
+   995→        <h4 className="font-bold text-slate-900 text-sm mb-2">
+   996→          سه مرحله محاسبه (مشترک در هر دو روش)
+   997→        </h4>
+   998→        <ol className="list-decimal list-inside space-y-1.5 text-sm text-slate-600 leading-7">
+   999→          <li>
+  1000→            درآمد مشمول: اظهارنامه {faNum(result.ehtar.taxable)} ریال / تبصره
+  1001→            ۱۰۰ {faNum(result.tabsare.taxable)} ریال
+  1002→          </li>
+  1003→          <li>معافیت ماده ۱۰۱: {faNum(result.exemptionTotal)} ریال</li>
+  1004→          <li>
+  1005→            مالیات پلکانی ماده ۱۳۱: اظهارنامه {faNum(result.ehtar.tax.total)}{" "}
+  1006→            ریال / تبصره ۱۰۰ {faNum(result.tabsare.tax.total)} ریال
+  1007→          </li>
+  1008→        </ol>
+  1009→        <p className="mt-3 text-xs text-slate-500 leading-6 flex items-start gap-1.5">
+  1010→          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+  1011→          این تحلیل آموزشی است و جایگزین بررسی تخصصی پرونده نیست؛ برای
+  1012→          پرونده‌های حساس با مشاور مالیاتی مشورت کنید.
+  1013→        </p>
+  1014→      </div>
+  1015→    </div>
+  1016→  );
+  1017→}
+  1018→
+  1019→function MiniStat({ title, value }: { title: string; value: string }) {
+  1020→  return (
+  1021→    <div className="bg-slate-900 rounded-xl p-4">
+  1022→      <span className="text-xs text-slate-300 block">{title}</span>
+  1023→      <span className="text-sm font-extrabold text-yellow-400 mt-1 block">
+  1024→        {value}
+  1025→      </span>
+  1026→    </div>
+  1027→  );
+  1028→}
+  1029→

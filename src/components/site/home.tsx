@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 
-export type Tool = "compare" | "salary-tax" | "payroll" | "check-due" | "intacode";
+export type Tool = "compare" | "salary-tax" | "payroll" | "check-due" | "intacode" | "declaration";
 
 const services = [
   {
@@ -80,6 +80,12 @@ const services = [
 ];
 
 const tools: { id: Tool; icon: typeof Calculator; title: string; desc: string }[] = [
+  {
+    id: "declaration",
+    icon: FileText,
+    title: "شبیه‌ساز اظهارنامه عملکرد و ارزش افزوده",
+    desc: "فرم استاندارد اظهارنامه عملکرد (مالیات بر درآمد) و ارزش افزوده را پر کنید و خروجی استاندارد مالیاتی — درآمد مشمول، پله‌های مالیاتی و مبلغ نهایی — بگیرید.",
+  },
   {
     id: "compare",
     icon: Calculator,
@@ -274,7 +280,7 @@ export function HomeView({ onOpenTool }: { onOpenTool: (t: Tool) => void }) {
 
       {/* Tools */}
       <Section id="tools" title="ابزارهای رایگان محاسبه" subtitle="ارقام را خودتان برآورد کنید؛ نرخ‌ها بر اساس بودجه ۱۴۰۵">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {tools.map((t) => (
             <div key={t.id} className="flex flex-col bg-white rounded-2xl border border-slate-200 p-6 hover:border-yellow-300 hover:shadow-md transition-all">
               <div className="grid place-items-center h-12 w-12 rounded-xl bg-yellow-400 text-slate-900">
